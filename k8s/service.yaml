@@ -1,0 +1,13 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: users-service
+  labels:
+    app: users-service
+  namespace: ikomida
+spec:
+  selector:
+     app: users
+  ports:
+  - protocol: TCP
+    port: 1988
