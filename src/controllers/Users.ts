@@ -15,12 +15,20 @@ import {
 import { CompactSign, importPKCS8 } from 'jose';
 import crypto from 'crypto';
 
+const host: any = {
+  development: 'https://dev.reseller.ikomida.com/',
+  homologation: 'https://hmlg.reseller.ikomida.com/',
+  production: 'https://reseller.ikomida.com/',
+}
+
 export default class Users {
   private logger;
   private blockWindow = 30 * 60 * 1000; // bloquear por 30 minutos em milisegundos
+  host
 
   constructor(logger: Utils.Logger) {
     this.logger = logger;
+    this.host = host[process.env.NODE_ENV ?? 'development'];
   }
 
   async logOut(identity: Types.Classes.CUser) {
@@ -243,8 +251,7 @@ export default class Users {
         })
         .sign(ecPrivateKey);
     } catch (error: any) {
-      //TODO: -- report errors
-      console.error(error.message);
+      this.logger.error(error);
     }
     return null;
   }
@@ -326,7 +333,6 @@ export default class Users {
       await userModel?.save();
       return new Utils.Return(result !== null, result);
     } catch (exception: any) {
-      console.error(exception);
       const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_AUTH_EXCEPTION, exception);
       return error.logAndReturn(this.logger);
     }
@@ -403,7 +409,6 @@ export default class Users {
         return new Utils.Return(true, signature);
       }
     } catch (exception: any) {
-      console.error(exception);
       const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_EXCEPTION, exception);
       return error.logAndReturn(this.logger);
     }
@@ -583,11 +588,11 @@ export default class Users {
               Utils.Email.RESELLER_REGISTRATION_SUCCESSFULL,
               'iKomida vendedor',
               userModel?.name,
-              'https://reseller.ikomida.com/apps',
+              `${this.host}apps`,
               userModel?.phone,
               '',
               'iKomida',
-              'https://reseller.ikomida.com/',
+              this.host,
             );
           }
           const emailPayload = new Types.Classes.CAMQPPayload<Types.Classes.CAMQPPayloadObject>();
@@ -730,7 +735,6 @@ export default class Users {
         return error.logAndReturn(this.logger);
       }
       const phoneValidationCodeModels = await userModel?.$get('phoneValidationCodes', {
-        logging: console.log,
         where: {
           role,
           code: payload.phoneValidationCode,
