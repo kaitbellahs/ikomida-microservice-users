@@ -1,23 +1,23 @@
 steps:
-  - id: dockerCache
-    name: "gcr.io/cloud-builders/docker"
-    entrypoint: "bash"
-    args:
-      [
-        "-c",
-        "docker pull us-central1-docker.pkg.dev/$PROJECT_ID/docker/users-microservice-image:latest || exit 0",
-      ]
+  # - id: dockerCache
+  #   name: "gcr.io/cloud-builders/docker"
+  #   entrypoint: "bash"
+  #   args:
+  #     [
+  #       "-c",
+  #       "docker pull us-central1-docker.pkg.dev/$PROJECT_ID/docker/users-microservice-image:latest || exit 0",
+  #     ]
   - id: dockerBuild
     name: "gcr.io/cloud-builders/docker"
     entrypoint: "bash"
     args:
       [
         "-c",
-        'docker build -t us-central1-docker.pkg.dev/$PROJECT_ID/docker/users-microservice-image:latest . --build-arg GOOGLE_SERVICE_ACCOUNT="$(echo $$GOOGLE_SERVICE_ACCOUNT)" --build-arg PROJECT_ID=$(echo $PROJECT_ID) --cache-from us-central1-docker.pkg.dev/$PROJECT_ID/docker/users-microservice-image:latest',
+        '(docker pull us-central1-docker.pkg.dev/$PROJECT_ID/docker/users-microservice-image:latest || true) && docker build --cache-from us-central1-docker.pkg.dev/$PROJECT_ID/docker/users-microservice-image:latest -t us-central1-docker.pkg.dev/$PROJECT_ID/docker/users-microservice-image:latest . --build-arg GOOGLE_SERVICE_ACCOUNT="$(echo $$GOOGLE_SERVICE_ACCOUNT)" --build-arg PROJECT_ID=$(echo $PROJECT_ID)',
       ]
     secretEnv: ["GOOGLE_SERVICE_ACCOUNT"]
-    waitFor:
-      - dockerCache
+    # waitFor:
+    #   - dockerCache
   - id: dockerPush
     name: "gcr.io/cloud-builders/docker"
     args:
@@ -37,7 +37,7 @@ steps:
       ]
     env:
       - "PROJECT_ID=$PROJECT_ID"
-      - "CLOUDSDK_COMPUTE_ZONE=us-central1"
+      - "CLOUDSDK_COMPUTE_ZONE=us-central1-b"
       - "CLOUDSDK_CONTAINER_CLUSTER=ikomida-cluster"
     waitFor:
       - dockerPush
