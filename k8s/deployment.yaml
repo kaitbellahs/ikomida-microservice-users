@@ -35,7 +35,7 @@ spec:
           resources:
             requests:
               cpu: "18m"
-              memory: "60Mi"
+              memory: "72Mi"
             limits:
               cpu: "150m"
           env:
@@ -105,8 +105,8 @@ spec:
                 secretKeyRef:
                   name: environment
                   key: MQVHOST
-            - name: PROJID
+            - name: CALC_DISTANCE_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: environment
-                  key: PROJID
+                  key: CALC_DISTANCE_API_KEY
