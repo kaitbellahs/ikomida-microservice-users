@@ -26,12 +26,9 @@ export default class Addresses {
           selected: false,
         });
       }
-      const addressOrigin = `${contractModel.addresses?.[0]?.street}, ${contractModel.addresses?.[0]?.number}, ${contractModel.addresses?.[0]?.neighborhood} - ${contractModel.addresses?.[0]?.city}/${contractModel.addresses?.[0]?.stat}, cep:${contractModel.addresses?.[0]?.postalCode}`;
-      const addressDelivery = `${payload.street}, ${payload.number}, ${payload.neighborhood} - ${payload.city}/${payload.stat}, cep:${payload.postalCode}`;
       const calcDistanceResponse = await Utils.GoogleAdmin.calcDistance(
-        'AIzaSyALGb2OIZtoGOf6knlahaTvXV7TQ2yYWqU',
-        addressOrigin,
-        addressDelivery,
+        contractModel.addresses?.[0],
+        payload,
       );
       if (!calcDistanceResponse) {
         const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_ADDRESS_NEW_ADDRESS_EXCEPTION);
