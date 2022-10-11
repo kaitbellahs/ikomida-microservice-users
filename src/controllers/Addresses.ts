@@ -9,8 +9,7 @@ export default class Addresses {
   async newAddress(identity: Types.Classes.CUser, input: any) {
     try {
       const payload: Types.Classes.CAddress = Types.Classes.CAddress.fromObject(input)
-      //TODO: -- add !payload.validate() || 
-      if (!this.validateAddress(payload)) {
+      if (!payload.validate()) {
         const error = new Utils.iKomidaError(
           Utils.iKomidaError.IKOMIDA_USERS_SERVICE_ADDRESS_NEW_ADDRESS_INVALID_ADDRESS
         )
@@ -187,9 +186,5 @@ export default class Addresses {
     const userModel = userModels[0]
     const addressModels = userModel?.addresses
     return { contractModel, userModel, addressModels }
-  }
-
-  validateAddress(object: any) {
-    return objHasProp(['postalCode', 'street', 'name', 'number', 'neighborhood', 'city', 'stat'], object)
   }
 }
