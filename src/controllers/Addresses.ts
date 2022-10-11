@@ -9,7 +9,8 @@ export default class Addresses {
   async newAddress(identity: Types.Classes.CUser, input: any) {
     try {
       const payload: Types.Classes.CAddress = Types.Classes.CAddress.fromObject(input)
-      if (!payload.validate() || !this.validateAddress(payload)) {
+      //TODO: -- add !payload.validate() || 
+      if (!this.validateAddress(payload)) {
         const error = new Utils.iKomidaError(
           Utils.iKomidaError.IKOMIDA_USERS_SERVICE_ADDRESS_NEW_ADDRESS_INVALID_ADDRESS
         )
