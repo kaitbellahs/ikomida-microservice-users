@@ -34,7 +34,7 @@ export default class Addresses {
         return error.logAndReturn(this.logger)
       }
       const [distance, duration] = calcDistanceResponse as number[]
-      const addressModel = await userModel.$create('address', {
+      await userModel.$create('address', {
         kind: Types.Types.TAddress.RESIDENTIAL,
         role: identity.role,
         postalCode: payload.postalCode,
@@ -46,9 +46,9 @@ export default class Addresses {
         city: payload.city,
         distance,
         duration,
-        stat: payload.stat
+        stat: payload.stat,
+        contractId: contractModel.id
       })
-      await contractModel.$add('addresses', addressModel)
       return await this.getAddresses(identity)
     } catch (exception: any) {
       const error = new Utils.iKomidaError(
