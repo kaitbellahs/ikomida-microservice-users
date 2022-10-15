@@ -587,17 +587,17 @@ export default class Users {
       await transaction.commit()
       try {
         if (userModel) {
-          let emailMessage
+          let message
 
           if (role === BackendTypes.Roles.CLIENT) {
-            emailMessage = new Utils.Email(
+            message = new Utils.Email(
               Utils.Email.CLIENT_REGISTRATION_SUCCESSFULL,
               contractModel?.contractName ?? 'iKomida',
               userModel?.name,
               contractModel?.contractName ?? 'iKomida'
             )
           } else {
-            emailMessage = new Utils.Email(
+            message = new Utils.Email(
               Utils.Email.RESELLER_REGISTRATION_SUCCESSFULL,
               'iKomida vendedor',
               userModel?.name,
@@ -610,7 +610,7 @@ export default class Users {
           }
           const emailPayload = new Types.Classes.CAMQPPayload<Types.Classes.CAMQPPayloadObject>()
           emailPayload.method = 'send'
-          const payloadObject: Types.Classes.CAMQPPayloadObject = Types.Classes.CAMQPPayloadObject.fromObject({
+          const messagePayload: Types.Classes.CEmail = Types.Classes.CEmail.fromObject({
             from: {
               email: `no-replay@ikomida.com`,
               name: `iKomida`
@@ -619,9 +619,9 @@ export default class Users {
               email: userModel?.email,
               name: `${userModel?.name} ${userModel?.lastName}`
             },
-            message: emailMessage
+            message
           })
-          emailPayload.object = payloadObject
+          emailPayload.object = messagePayload
           const amqp = new Domain.RabbitMQ(this.logger)
           await amqp?.publish(Domain.RabbitMQ.EMAIL_QUEUE, emailPayload)
           await amqp?.close()
@@ -817,7 +817,7 @@ export default class Users {
         autocommit: false
       })
       await userModel?.save({ transaction })
-      const emailMessage = new Utils.Email(
+      const message = new Utils.Email(
         Utils.Email.CLIENT_PASSWORD_REQUESTED_SUCCESSFULL,
         contractModel?.contractName ?? 'iKomida',
         userModel?.name,
@@ -827,7 +827,7 @@ export default class Users {
 
       const emailPayload = new Types.Classes.CAMQPPayload<Types.Classes.CAMQPPayloadObject>()
       emailPayload.method = 'send'
-      const payloadObject: Types.Classes.CAMQPPayloadObject = Types.Classes.CAMQPPayloadObject.fromObject({
+      const messagePayload: Types.Classes.CEmail = Types.Classes.CEmail.fromObject({
         from: {
           email: `no-replay@ikomida.com`,
           name: `iKomida`
@@ -836,9 +836,9 @@ export default class Users {
           email: userModel?.email,
           name: `${userModel?.name} ${userModel?.lastName}`
         },
-        message: emailMessage
+        message
       })
-      emailPayload.object = payloadObject
+      emailPayload.object = messagePayload
       const amqp = new Domain.RabbitMQ(this.logger)
       await amqp?.publish(Domain.RabbitMQ.EMAIL_QUEUE, emailPayload)
       await amqp?.close()
@@ -1001,7 +1001,7 @@ export default class Users {
       userModel.password = (await cryptPassword(payload.newPass)).hash
       await userModel?.save()
       try {
-        const emailMessage = new Utils.Email(
+        const message = new Utils.Email(
           Utils.Email.CLIENT_PASSWORD_UPDATED_SUCCESSFULL,
           contractModel?.contractName ?? 'iKomida',
           userModel?.name,
@@ -1009,7 +1009,7 @@ export default class Users {
         )
         const emailPayload = new Types.Classes.CAMQPPayload<Types.Classes.CAMQPPayloadObject>()
         emailPayload.method = 'send'
-        const payloadObject: Types.Classes.CAMQPPayloadObject = Types.Classes.CAMQPPayloadObject.fromObject({
+        const messagePayload: Types.Classes.CEmail = Types.Classes.CEmail.fromObject({
           from: {
             email: `no-replay@ikomida.com`,
             name: `iKomida`
@@ -1018,9 +1018,9 @@ export default class Users {
             email: userModel?.email,
             name: `${userModel?.name} ${userModel?.lastName}`
           },
-          message: emailMessage
+          message
         })
-        emailPayload.object = payloadObject
+        emailPayload.object = messagePayload
         const amqp = new Domain.RabbitMQ(this.logger)
         await amqp?.publish(Domain.RabbitMQ.EMAIL_QUEUE, emailPayload)
         await amqp?.close()
