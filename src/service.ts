@@ -2,6 +2,7 @@ import express from 'express'
 import bodyParser from 'body-parser'
 import Addresses from './controllers/Addresses.js'
 import Users from './controllers/Users.js'
+import Profiles from './controllers/Profiles.js'
 import { BackendTypes, Utils } from '@ikomida/shared-backend'
 
 import { createRequire } from 'module'
@@ -22,6 +23,7 @@ Utils.System.setExpressResponse(app)
 const port = process?.env?.PORT || 80
 const addresses = new Addresses(logger)
 const users = new Users(logger)
+const profiles = new Profiles(logger)
 
 app.get('/addresses', async (req, res) => {
   const identity: Types.Classes.CUser = Types.Classes.CUser.fromObject(req.headers?.identity)
@@ -55,6 +57,18 @@ app.put('/address/:id', async (req, res) => {
 app.delete('/address/:id', async (req, res) => {
   const identity: Types.Classes.CUser = Types.Classes.CUser.fromObject(req.headers?.identity)
   const payload = await addresses.removeAddress(identity, req?.params?.id)
+  res.sendResponse(payload)
+})
+
+app.patch('/profile/avatar', async (req, res) => {
+  const identity: Types.Classes.CUser = Types.Classes.CUser.fromObject(req.headers?.identity)
+  const payload = await profiles.updateAvatar(identity, req?.body)
+  res.sendResponse(payload)
+})
+
+app.get('/profile', async (req, res) => {
+  const identity: Types.Classes.CUser = Types.Classes.CUser.fromObject(req.headers?.identity)
+  const payload = await profiles.profile(identity)
   res.sendResponse(payload)
 })
 
