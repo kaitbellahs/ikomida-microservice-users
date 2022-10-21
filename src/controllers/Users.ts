@@ -14,6 +14,7 @@ import {
 } from '@ikomida/shared-backend'
 import { CompactSign, importPKCS8 } from 'jose'
 import crypto from 'crypto'
+import { IiKomidaErrorModel } from '@ikomida/shared-backend/lib/Utils/iKomidaError'
 
 const host: any = {
   development: 'https://dev.reseller.ikomida.com/',
@@ -22,6 +23,12 @@ const host: any = {
 }
 
 export default class Users {
+
+  IKOMIDA_GATEWAY_SERVICE_AUTH_MULTI_DEVICE: IiKomidaErrorModel = {
+    code: 'IMUA001',
+    message:
+      'Esta conta está vinculada com outro dispositivo, por favor desvincule sua conta no outro dispositivo e volte a fazer o login aqui!'
+  }
   private logger
   private blockWindow = 30 * 60 * 1000 // bloquear por 30 minutos em milisegundos
   host
@@ -120,8 +127,8 @@ export default class Users {
     role: BackendTypes.Roles | null,
     ikomidaID: string,
     options: Types.Classes.CLoginOptions,
-    areaCode: string | number | undefined,
-    phone: string | number | undefined,
+    areaCodeNumber: string | number | undefined,
+    phoneNumber: string | number | undefined,
     isLoggin = false
   ) {
     let loginFailModel
@@ -137,6 +144,8 @@ export default class Users {
         }
       })
     }
+    const areaCode = Logics.Finances.toNumber(areaCodeNumber)
+    const phone = Logics.Finances.toNumber(phoneNumber)
     if (role && [BackendTypes.Roles.CLIENT, BackendTypes.Roles.VENDOR, BackendTypes.Roles.STAFF].includes(role)) {
       const rules = role === BackendTypes.Roles.VENDOR ? [BackendTypes.Roles.VENDOR, BackendTypes.Roles.STAFF] : [role]
       if (isLoggin) {
@@ -149,8 +158,8 @@ export default class Users {
                 role: {
                   [Domain.SqlDB.Op.in]: rules
                 },
-                phone: Logics.Finances.toNumber(phone),
-                areaCode: Logics.Finances.toNumber(areaCode)
+                phone: Logics.Finances.toNumber(phoneNumber),
+                areaCode: Logics.Finances.toNumber(areaCodeNumber)
               }
             ]
           }
@@ -158,6 +167,9 @@ export default class Users {
         if (!this.userAllowed(loginFailModel)) {
           await this.handleBlock(loginFailModel)
         }
+      }
+      if (role === BackendTypes.Roles.CLIENT && phone === '11900000000' && areaCode === '55') {
+        ikomidaID = 'com.ikomida.br.demo'
       }
       const findOne = {
         where: {
@@ -170,8 +182,8 @@ export default class Users {
               role: {
                 [Domain.SqlDB.Op.in]: rules
               },
-              phone: Logics.Finances.toNumber(phone),
-              areaCode: Logics.Finances.toNumber(areaCode)
+              phone,
+              areaCode
             },
             include: [
               {
@@ -203,8 +215,8 @@ export default class Users {
                 role: {
                   [Domain.SqlDB.Op.in]: role
                 },
-                phone: Logics.Finances.toNumber(phone),
-                areaCode: Logics.Finances.toNumber(areaCode)
+                phone,
+                areaCode
               }
             ]
           }
@@ -215,8 +227,8 @@ export default class Users {
       }
       const where = {
         role,
-        phone: Logics.Finances.toNumber(phone),
-        areaCode: Logics.Finances.toNumber(areaCode)
+        phone,
+        areaCode
       }
       userModels = await DBModels.UserModel.findAll({
         where,
@@ -276,9 +288,9 @@ export default class Users {
       ) {
         throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_AUTH_MISSING_DATA)
       }
-      const { userModel, userModels, loginFailModel } = role
+      const { userModel, userModels, contractModel, loginFailModel } = role
         ? await this.getUnloggedUserModels(role, ikomidaID, options, areaCode, phone, true)
-        : { userModel: null, userModels: null, loginFailModel: null }
+        : { userModel: null, userModels: null, contractModel: null, loginFailModel: null }
       if (userModels?.length !== 1 || !userModel || !(await comparePassword(String(password), userModel.password))) {
         let message = '!'
         if (loginFailModel) {
@@ -314,7 +326,7 @@ export default class Users {
         (!(options.platform !== null && [undefined, options.platform].includes(userInfoModel?.platform)) ||
           !(options.deviceId !== null && [undefined, options.deviceId].includes(userInfoModel?.deviceId)))
       ) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_AUTH_MULTI_DEVICE)
+        const error = new Utils.iKomidaError(this.IKOMIDA_GATEWAY_SERVICE_AUTH_MULTI_DEVICE)
         error.setStatus(409)
         throw error
       }
@@ -328,6 +340,13 @@ export default class Users {
         }
       })
       await userModel.$create('userInfo', options)
+      if (contractModel?.ikomidaID === 'com.ikomida.br.demo') {
+        await DBModels.UserInfoModel.destroy({
+          where: {
+            userId: userModel?.id
+          }
+        })
+      }
       await userModel?.save()
       return new Utils.Return(result !== null, result)
     } catch (exception: any) {
