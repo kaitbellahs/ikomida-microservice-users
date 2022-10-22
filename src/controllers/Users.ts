@@ -10,82 +10,94 @@ import {
   passwordGenerator,
   Types,
   DBModels,
-  objHasProp,
-} from '@ikomida/shared-backend';
-import { CompactSign, importPKCS8 } from 'jose';
-import crypto from 'crypto';
+  objHasProp
+} from '@ikomida/shared-backend'
+import { CompactSign, importPKCS8 } from 'jose'
+import crypto from 'crypto'
+import { IiKomidaErrorModel } from '@ikomida/shared-backend/lib/Utils/iKomidaError'
 
 const host: any = {
   development: 'https://dev.reseller.ikomida.com/',
   homologation: 'https://hmlg.reseller.ikomida.com/',
-  production: 'https://reseller.ikomida.com/',
+  production: 'https://reseller.ikomida.com/'
 }
 
 export default class Users {
-  private logger;
-  private blockWindow = 30 * 60 * 1000; // bloquear por 30 minutos em milisegundos
+
+  IKOMIDA_GATEWAY_SERVICE_AUTH_MULTI_DEVICE: IiKomidaErrorModel = {
+    code: 'IMUA001',
+    message:
+      'Esta conta está vinculada com outro dispositivo, por favor desvincule sua conta no outro dispositivo e volte a fazer o login aqui!'
+  }
+  private logger
+  private blockWindow = 30 * 60 * 1000 // bloquear por 30 minutos em milisegundos
   host
 
   constructor(logger: Utils.Logger) {
-    this.logger = logger;
-    this.host = host[process.env.NODE_ENV ?? 'development'];
+    this.logger = logger
+    this.host = host[process.env.NODE_ENV ?? 'development']
   }
 
   async logOut(identity: Types.Classes.CUser) {
     try {
-      const role = BackendTypes.Roles.valueOf(identity.role);
-      let userModels: DBModels.UserModel[] | undefined;
+      const role = BackendTypes.Roles.valueOf(identity.role)
+      let userModels: DBModels.UserModel[] | undefined
       if (role && [BackendTypes.Roles.CLIENT, BackendTypes.Roles.VENDOR, BackendTypes.Roles.STAFF].includes(role)) {
         const contractModel = await DBModels.ContractModel.findOne({
           where: {
-            ikomidaID: identity?.ikomidaID,
+            ikomidaID: identity?.ikomidaID
           },
           include: {
             model: DBModels.UserModel,
             where: {
               role: identity?.role,
-              id: identity?.id,
+              id: identity?.id
             },
             required: true,
             include: [
               {
                 model: DBModels.UserInfoModel,
-                required: false,
-              },
-            ],
-          },
-        });
+                required: false
+              }
+            ]
+          }
+        })
         if (!contractModel) {
-          const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_INVALID_CONTRACT);
-          return error.logAndReturn(this.logger);
+          throw new Utils.iKomidaError(
+            Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_INVALID_CONTRACT
+          )
         }
-        userModels = contractModel?.users;
+        userModels = contractModel?.users
       } else {
         userModels = await DBModels.UserModel.findAll({
           where: {
             role: identity?.role,
-            id: identity?.id,
+            id: identity?.id
           },
           include: {
             model: DBModels.UserInfoModel,
-            required: false,
-          },
-        });
+            required: false
+          }
+        })
       }
       if (userModels?.length !== 1) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_INVALID_CONTRACT);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(
+          Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_INVALID_CONTRACT
+        )
       }
-      const userModel = userModels?.[0];
+      const userModel = userModels?.[0]
       await DBModels.UserInfoModel.destroy({
         where: {
-          userId: userModel?.id,
-        },
-      });
-      return new Utils.Return(true);
+          userId: userModel?.id
+        }
+      })
+      return new Utils.Return(true)
     } catch (exception: any) {
-      const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_AUTH_EXCEPTION, exception);
-      return error.logAndReturn(this.logger);
+      let error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_AUTH_EXCEPTION, exception)
+      if (exception instanceof Utils.iKomidaError) {
+        error = exception
+      }
+      return error.logAndReturn(this.logger)
     }
   }
 
@@ -93,11 +105,11 @@ export default class Users {
     return (
       !loginFailModel?.blockDate ||
       new Date().getTime() > (loginFailModel?.blockWindow ?? 0) + loginFailModel?.blockDate?.getTime()
-    );
+    )
   }
 
   private async handleBlock(loginFailModel?: DBModels.LoginFailModel | null) {
-    await loginFailModel?.increment({ attempts: 1 });
+    await loginFailModel?.increment({ attempts: 1 })
     const error = new Utils.iKomidaError(
       Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_AUTH_TOO_MANY_ATEMPTS,
       ((loginFailModel?.blockWindow ?? 0) / 60 / 1000).toFixed(0),
@@ -105,35 +117,40 @@ export default class Users {
         ((loginFailModel?.blockWindow ?? 0) + (loginFailModel?.blockDate?.getTime() ?? 0) - new Date().getTime()) /
         60 /
         1000
-      ).toFixed(0),
-    );
-    error.setStatus(429);
-    return error.logAndReturn(this.logger);
+      ).toFixed(0)
+    )
+    error.setStatus(429)
+    throw error
   }
 
   private async getUnloggedUserModels(
     role: BackendTypes.Roles | null,
     ikomidaID: string,
     options: Types.Classes.CLoginOptions,
-    areaCode: string | number | undefined,
-    phone: string | number | undefined,
-    isLoggin = false,
+    areaCodeNumber: string | number | undefined,
+    phoneNumber: string | number | undefined,
+    isLoggin = false
   ) {
-    let loginFailModel;
-    let userModels;
-    let contractModel;
+    let loginFailModel
+    let userModels
+    let contractModel
     if (isLoggin) {
       await DBModels.LoginFailModel.destroy({
         where: {
           createdAt: {
-            [Domain.SqlDB.Op.lt]: new Date(new Date().getTime() - this.blockWindow * 2),
+            [Domain.SqlDB.Op.lt]: new Date(new Date().getTime() - this.blockWindow * 2)
           },
-          blockDate: null,
-        },
-      });
+          blockDate: null
+        }
+      })
     }
+    const areaCode = Logics.Finances.toNumber(areaCodeNumber)
+    const phone = Logics.Finances.toNumber(phoneNumber)
     if (role && [BackendTypes.Roles.CLIENT, BackendTypes.Roles.VENDOR, BackendTypes.Roles.STAFF].includes(role)) {
-      const rules = role === BackendTypes.Roles.VENDOR ? [BackendTypes.Roles.VENDOR, BackendTypes.Roles.STAFF] : [role];
+      const rules = role === BackendTypes.Roles.VENDOR ? [BackendTypes.Roles.VENDOR, BackendTypes.Roles.STAFF] : [role]
+      if (role === BackendTypes.Roles.CLIENT && phone === '11900000000' && areaCode === '55') {
+        ikomidaID = 'com.ikomida.br.demo'
+      }
       if (isLoggin) {
         loginFailModel = await DBModels.LoginFailModel.findOne({
           where: {
@@ -142,118 +159,118 @@ export default class Users {
               {
                 ikomidaID,
                 role: {
-                  [Domain.SqlDB.Op.in]: rules,
+                  [Domain.SqlDB.Op.in]: rules
                 },
-                phone: Logics.Finances.toNumber(phone),
-                areaCode: Logics.Finances.toNumber(areaCode),
-              },
-            ],
-          },
-        });
+                phone: Logics.Finances.toNumber(phoneNumber),
+                areaCode: Logics.Finances.toNumber(areaCodeNumber)
+              }
+            ]
+          }
+        })
         if (!this.userAllowed(loginFailModel)) {
-          return await this.handleBlock(loginFailModel);
+          await this.handleBlock(loginFailModel)
         }
       }
       const findOne = {
         where: {
-          ikomidaID,
+          ikomidaID
         },
         include: [
           {
             model: DBModels.UserModel,
             where: {
               role: {
-                [Domain.SqlDB.Op.in]: rules,
+                [Domain.SqlDB.Op.in]: rules
               },
-              phone: Logics.Finances.toNumber(phone),
-              areaCode: Logics.Finances.toNumber(areaCode),
+              phone,
+              areaCode
             },
             include: [
               {
                 model: DBModels.ReferralModel,
                 as: 'referral',
-                required: false,
+                required: false
               },
               {
                 model: DBModels.UserInfoModel,
-                required: false,
-              },
+                required: false
+              }
             ],
-            required: false,
-          },
-        ],
-      };
-      contractModel = await DBModels.ContractModel.findOne(findOne);
-      if (!contractModel) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_AUTH_INVALID_CONTRACT);
-        return error.logAndReturn(this.logger);
+            required: false
+          }
+        ]
       }
-      userModels = contractModel?.users;
+      contractModel = await DBModels.ContractModel.findOne(findOne)
+      if (!contractModel) {
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_AUTH_INVALID_CONTRACT)
+      }
+      userModels = contractModel?.users
     } else {
       if (isLoggin) {
         loginFailModel = await DBModels.LoginFailModel.findOne({
+
           where: {
             [Domain.SqlDB.Op.or]: [
               { ip: options.ip },
               {
                 role: {
-                  [Domain.SqlDB.Op.in]: role,
+                  [Domain.SqlDB.Op.in]: role
                 },
-                phone: Logics.Finances.toNumber(phone),
-                areaCode: Logics.Finances.toNumber(areaCode),
-              },
-            ],
-          },
-        });
+                phone,
+                areaCode
+              }
+            ]
+          }
+        })
         if (!this.userAllowed(loginFailModel)) {
-          return await this.handleBlock(loginFailModel);
+          await this.handleBlock(loginFailModel)
         }
       }
       const where = {
         role,
-        phone: Logics.Finances.toNumber(phone),
-        areaCode: Logics.Finances.toNumber(areaCode),
-      };
+        phone,
+        areaCode
+      }
       userModels = await DBModels.UserModel.findAll({
         where,
         include: [
           {
             model: DBModels.ReferralModel,
             as: 'referral',
-            required: false,
+            required: false
           },
           {
             model: DBModels.UserInfoModel,
-            required: false,
-          },
-        ],
-      });
+            required: false
+          }
+        ]
+      })
     }
-    const userModel = userModels?.[0];
-    return { userModel, userModels, contractModel, loginFailModel };
+    const userModel = userModels?.[0]
+    return { userModel, userModels, contractModel, loginFailModel }
   }
 
   private async generateAccessToken(payload: Types.Classes.CUser) {
     try {
-      const algorithm = 'PS256';
-      const hashAlgo = 'SHA256';
-      const pkcs8 = Buffer.from(process.env.IKOMIDA_PRIVATEKEY ?? '', 'base64').toString();
-      const ecPrivateKey = await importPKCS8(pkcs8, algorithm);
-      const shasum = crypto.createHash(hashAlgo);
-      payload.timestamp = Date.now();
-      shasum.update(JSON.stringify(payload));
-      const hash = shasum.digest('hex');
-      payload.hash = hash;
+      const algorithm = 'PS256'
+      const hashAlgo = 'SHA256'
+      const pkcs8 = Buffer.from(process.env.IKOMIDA_PRIVATEKEY ?? '', 'base64').toString()
+      const ecPrivateKey = await importPKCS8(pkcs8, algorithm)
+      const shasum = crypto.createHash(hashAlgo)
+      payload.timestamp = Date.now()
+      shasum.update(JSON.stringify(payload))
+      const hash = shasum.digest('hex')
+      payload.hash = hash
       return await new CompactSign(new TextEncoder().encode(JSON.stringify(payload)))
         .setProtectedHeader({
           alg: algorithm,
-          typ: 'JWS',
+          typ: 'JWS'
         })
-        .sign(ecPrivateKey);
+        .sign(ecPrivateKey)
     } catch (error: any) {
-      this.logger.error(error);
+      this.logger.error(error)
     }
-    return null;
+    return null
   }
 
   async authenticateUser(
@@ -262,37 +279,32 @@ export default class Users {
     areaCode: string | number,
     phone: string | number,
     password: string,
-    options: Types.Classes.CLoginOptions,
+    options: Types.Classes.CLoginOptions
   ) {
     try {
-      const role = BackendTypes.Roles.valueOf(inputRole);
+      const role = BackendTypes.Roles.valueOf(inputRole)
       if (
         (!role || !ikomidaID) &&
         (!options.platform || !options.deviceId || !options.ip || !areaCode || !phone || !password)
       ) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_AUTH_MISSING_DATA);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_AUTH_MISSING_DATA)
       }
-      const unloggedUserModels = role
+      const { userModel, userModels, contractModel, loginFailModel } = role
         ? await this.getUnloggedUserModels(role, ikomidaID, options, areaCode, phone, true)
-        : { userModel: null, userModels: null, loginFailModel: null };
-      if ('success' in unloggedUserModels) {
-        return unloggedUserModels;
-      }
-      const { userModel, userModels, loginFailModel } = unloggedUserModels;
+        : { userModel: null, userModels: null, contractModel: null, loginFailModel: null }
       if (userModels?.length !== 1 || !userModel || !(await comparePassword(String(password), userModel.password))) {
-        let message = '!';
+        let message = '!'
         if (loginFailModel) {
           if (loginFailModel && (loginFailModel?.attempts ?? 0) > 5) {
-            loginFailModel.attempts = (loginFailModel?.attempts ?? 0) + 1;
-            loginFailModel.blockDate = new Date();
-            loginFailModel.blockWindow = this.blockWindow;
-            await loginFailModel?.save();
-            message = ' O Acesso da sua conta foi bloqueado por 30 minutos!';
+            loginFailModel.attempts = (loginFailModel?.attempts ?? 0) + 1
+            loginFailModel.blockDate = new Date()
+            loginFailModel.blockWindow = this.blockWindow
+            await loginFailModel?.save()
+            message = ' O Acesso da sua conta foi bloqueado por 30 minutos!'
           } else {
-            await loginFailModel.increment({ attempts: 1 });
+            await loginFailModel.increment({ attempts: 1 })
             if ((loginFailModel?.attempts ?? 0) > 2) {
-              message = ` O Acesso da sua conta será bloqueado após ${6 - (loginFailModel?.attempts ?? 0)} tentativas!`;
+              message = ` O Acesso da sua conta será bloqueado após ${6 - (loginFailModel?.attempts ?? 0)} tentativas!`
             }
           }
         } else {
@@ -302,222 +314,242 @@ export default class Users {
             role: userModel?.role ?? role,
             phone: Logics.Finances.toNumber(phone),
             areaCode: Logics.Finances.toNumber(areaCode),
-            attempts: 1,
-          });
+            attempts: 1
+          })
         }
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_AUTH_UNAUTHORIZED, message);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_AUTH_UNAUTHORIZED, message)
       }
-      await loginFailModel?.destroy();
-      const userInfoModel = userModel?.userInfos?.[0];
+      await loginFailModel?.destroy()
+      const userInfoModel = userModel?.userInfos?.[0]
       if (
         (!role || !BackendTypes.Roles.isInternal(role)) &&
         userInfoModel &&
         (!(options.platform !== null && [undefined, options.platform].includes(userInfoModel?.platform)) ||
           !(options.deviceId !== null && [undefined, options.deviceId].includes(userInfoModel?.deviceId)))
       ) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_AUTH_MULTI_DEVICE);
-        error.setStatus(409);
-        return error.logAndReturn(this.logger);
+        const error = new Utils.iKomidaError(this.IKOMIDA_GATEWAY_SERVICE_AUTH_MULTI_DEVICE)
+        error.setStatus(409)
+        throw error
       }
-      const user = await this.createUserObject(role, ikomidaID, userModel, options?.platform ?? '-', options.deviceId);
-      user.id = userModel.id;
+      const user = await this.createUserObject(role, ikomidaID, userModel, options?.platform ?? '-', options.deviceId)
+      user.id = userModel.id
 
-      const result = await this.generateAccessToken(user);
+      const result = await this.generateAccessToken(user)
       await DBModels.UserInfoModel.destroy({
         where: {
-          userId: userModel?.id,
-        },
-      });
-      await userModel.$create('userInfo', options);
-      await userModel?.save();
-      return new Utils.Return(result !== null, result);
+          userId: userModel?.id
+        }
+      })
+      await userModel.$create('userInfo', options)
+      if (contractModel?.ikomidaID === 'com.ikomida.br.demo') {
+        await DBModels.UserInfoModel.destroy({
+          where: {
+            userId: userModel?.id
+          }
+        })
+      }
+      await userModel?.save()
+      return new Utils.Return(result !== null, result)
     } catch (exception: any) {
-      const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_AUTH_EXCEPTION, exception);
-      return error.logAndReturn(this.logger);
+      let error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_AUTH_EXCEPTION, exception)
+      if (exception instanceof Utils.iKomidaError) {
+        error = exception
+      }
+      return error.logAndReturn(this.logger)
     }
   }
 
   async createPhoneValidation(role: BackendTypes.Roles | null, ikomidaID: string | undefined, input: any) {
+    let transaction: Domain.SqlDB.Transaction | undefined = undefined
     try {
-      const payload: Types.Classes.CUser = Types.Classes.CUser.fromObject(input);
+      const payload: Types.Classes.CUser = Types.Classes.CUser.fromObject(input)
       if (!Logics.Validations.validateUUID(payload.termId)) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_MISSING_TERM);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_MISSING_TERM)
       }
       if (!ikomidaID || role !== BackendTypes.Roles.CLIENT) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_AUTHENTICATION);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_AUTHENTICATION)
       }
       if ((payload.name?.length ?? 0) <= 2) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_MISSING_NAME);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_MISSING_NAME)
       }
       if ((payload.lastName?.length ?? 0) <= 2) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_MISSING_LAST_NAME);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(
+          Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_MISSING_LAST_NAME
+        )
       }
       if (!Logics.Validations.validateCPF(payload.identity)) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_MISSING_CPF);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_MISSING_CPF)
       }
       if (!Logics.Validations.validateEmail(payload.email)) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_MISSING_EMAIL);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_MISSING_EMAIL)
       }
       if (!Logics.Validations.validatePhone(payload.phone)) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_MISSING_PHONE);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_MISSING_PHONE)
       }
       if (!Logics.Validations.validatePassword(payload.password)) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_MISSING_PASSWORD);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(
+          Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_MISSING_PASSWORD
+        )
       }
       const contractModel = await DBModels.ContractModel.findOne({
         where: {
-          ikomidaID,
-        },
-      });
+          ikomidaID
+        }
+      })
       if (!contractModel) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_INVALID_CONTRACT);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(
+          Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_INVALID_CONTRACT
+        )
       }
-      const code = Logics.Finances.pad(Math.ceil(Math.random() * 10000), 4);
+      const code = Logics.Finances.pad(Math.ceil(Math.random() * 10000), 4)
       payload.ikomidaID = ikomidaID
       payload.role = role.id
       payload.phoneValidationCode = code
-      const signatureObject = payload.toJSON();
+      const signatureObject = payload.toJSON()
       delete signatureObject.signature
-      const signature = await signData(signatureObject);
+      const signature = await signData(signatureObject)
       const validationObject = {
         role,
         code,
-        signature,
-      };
-      const phoneValidationCodeModel = await contractModel.$create('phoneValidationCode', validationObject);
-      const message = new Utils.SMS(Utils.SMS.VALIDATION_CODE, code, contractModel?.contractName ?? 'iKomida');
-      const smsPayload = new Types.Classes.CAMQPPayload<Types.Classes.CAMQPPayloadObject>();
-      smsPayload.method = 'send';
-      smsPayload.object = new Types.Classes.CAMQPPayloadObject();
-      smsPayload.object.areaCode = String(payload.areaCode);
-      smsPayload.object.phone = payload.phone;
-      smsPayload.object.message = message;
-      const amqp = new Domain.RabbitMQ(this.logger);
-      await amqp?.publish(Domain.RabbitMQ.SMS_QUEUE, smsPayload);
-      await amqp?.close();
+        signature
+      }
+      transaction = await Domain.SqlDB.sequelize.transaction({
+        autocommit: false
+      })
+      const phoneValidationCodeModel = await contractModel.$create('phoneValidationCode', validationObject, {
+        transaction
+      })
+      const message = new Utils.SMS(Utils.SMS.VALIDATION_CODE, code, contractModel?.contractName ?? 'iKomida')
+      const smsPayload = new Types.Classes.CAMQPPayload<Types.Classes.CAMQPPayloadObject>()
+      smsPayload.method = 'send'
+      smsPayload.object = new Types.Classes.CAMQPPayloadObject()
+      smsPayload.object.areaCode = String(payload.areaCode)
+      smsPayload.object.phone = payload.phone
+      smsPayload.object.message = message
+      const amqp = new Domain.RabbitMQ(this.logger)
+      await amqp?.publish(Domain.RabbitMQ.SMS_QUEUE, smsPayload)
+      await amqp?.close()
       if (phoneValidationCodeModel) {
-        return new Utils.Return(true, signature);
+        await transaction.commit()
+        return new Utils.Return(true, signature)
       }
     } catch (exception: any) {
-      const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_EXCEPTION, exception);
-      return error.logAndReturn(this.logger);
+      await transaction?.rollback()
+      let error = new Utils.iKomidaError(
+        Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_EXCEPTION,
+        exception
+      )
+      if (exception instanceof Utils.iKomidaError) {
+        error = exception
+      }
+      return error.logAndReturn(this.logger)
     }
-    const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_UNKNOWN);
-    return error.logAndReturn(this.logger);
+    const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_UNKNOWN)
+    return error.logAndReturn(this.logger)
   }
 
   async validatePhoneValidationCode(role: BackendTypes.Roles | null, ikomidaID: string, input: any) {
     try {
-      const payload: Types.Classes.CUser = Types.Classes.CUser.fromObject(input);
+      const payload: Types.Classes.CUser = Types.Classes.CUser.fromObject(input)
       if (!Logics.Validations.validateUUID(payload.termId)) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_MISSING_TERM);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_MISSING_TERM)
       }
       if (!ikomidaID || role !== BackendTypes.Roles.CLIENT) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_AUTHENTICATION);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(
+          Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_AUTHENTICATION
+        )
       }
       if ((payload.name?.length ?? 0) <= 2) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_NAME);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_NAME)
       }
       if ((payload.lastName?.length ?? 0) <= 2) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_MISSING_LAST_NAME);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(
+          Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_MISSING_LAST_NAME
+        )
       }
       if (!Logics.Validations.validateCPF(payload.identity)) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_MISSING_CPF);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_MISSING_CPF)
       }
       if (!Logics.Validations.validateEmail(payload.email)) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_MISSING_EMAIL);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_MISSING_EMAIL)
       }
       if (!Logics.Validations.validatePhone(payload.phone)) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_MISSING_PHONE);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_MISSING_PHONE)
       }
       if (!Logics.Validations.validatePassword(payload.password)) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_MISSING_PASSWORD);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(
+          Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_MISSING_PASSWORD
+        )
       }
       if (!payload.signature) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_MISSING_SIGNATURE);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(
+          Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_MISSING_SIGNATURE
+        )
       }
       const contractModel = await DBModels.ContractModel.findOne({
         where: {
-          ikomidaID,
-        },
-      });
+          ikomidaID
+        }
+      })
       if (!contractModel) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_INVALID_CONTRACT);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(
+          Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_INVALID_CONTRACT
+        )
       }
       payload.ikomidaID = ikomidaID
       payload.role = role.id
-      const signatureObject = payload.toJSON();
+      const signatureObject = payload.toJSON()
       delete signatureObject.signature
       if (await validateSignature(signatureObject, payload.signature)) {
         const phoneValidationCodeModels = await contractModel.$get('phoneValidationCodes', {
           where: {
             role,
             code: payload.phoneValidationCode,
-            signature: payload.signature,
-          },
-        });
-        return new Utils.Return(phoneValidationCodeModels?.length === 1);
+            signature: payload.signature
+          }
+        })
+        return new Utils.Return(phoneValidationCodeModels?.length === 1)
       }
     } catch (exception: any) {
-      const error = new Utils.iKomidaError(
+      let error = new Utils.iKomidaError(
         Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_EXCEPTION,
-        exception.message,
-      );
-      return error.logAndReturn(this.logger);
+        exception.message
+      )
+      if (exception instanceof Utils.iKomidaError) {
+        error = exception
+      }
+      return error.logAndReturn(this.logger)
     }
-    const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_UNKNOWN);
-    return error.logAndReturn(this.logger);
+    const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_UNKNOWN)
+    return error.logAndReturn(this.logger)
   }
 
   async newUser(role: BackendTypes.Roles | null, ikomidaID: string, input: any) {
+    let transaction: Domain.SqlDB.Transaction | undefined = undefined
     try {
-      const payload: Types.Classes.CUser = Types.Classes.CUser.fromObject(input);
+      const payload: Types.Classes.CUser = Types.Classes.CUser.fromObject(input)
       if (!role || ![BackendTypes.Roles.CLIENT, BackendTypes.Roles.RESELLER].includes(role)) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_CONTRACT_SERVICE_INVALID_TERM_ID);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_CONTRACT_SERVICE_INVALID_TERM_ID)
       }
       const termModel = await DBModels.TermModel.findOne({
         where: {
-          id: payload.termId,
-        },
-      });
+          id: payload.termId
+        }
+      })
       if (!termModel) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_CONTRACT_SERVICE_INVALID_TERM_ID);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_CONTRACT_SERVICE_INVALID_TERM_ID)
       }
       const contractModel = await DBModels.ContractModel.findOne({
         where: {
-          ikomidaID,
-        },
-      });
+          ikomidaID
+        }
+      })
       if (role === BackendTypes.Roles.CLIENT && !contractModel) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_NEW_USER_INVALID_CONTRACT);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_NEW_USER_INVALID_CONTRACT)
       }
-      const validatePhoneValidationCode = await this.validatePhoneValidationCode(role, ikomidaID, input);
+      const validatePhoneValidationCode = await this.validatePhoneValidationCode(role, ikomidaID, input)
       if (!validatePhoneValidationCode?.success) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_NEW_USER_INVALID_PHONE_VALIDATION_CODE);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_NEW_USER_INVALID_PHONE_VALIDATION_CODE)
       }
       const where = {
         where: {
@@ -525,37 +557,38 @@ export default class Users {
           [Domain.SqlDB.Op.or]: [
             {
               areaCode: Logics.Finances.toNumber(payload.areaCode),
-              phone: Logics.Finances.toNumber(payload.phone),
+              phone: Logics.Finances.toNumber(payload.phone)
             },
             {
-              identity: Logics.Finances.toNumber(payload.identity),
+              identity: Logics.Finances.toNumber(payload.identity)
             },
             {
-              identity: payload.email,
-            },
-          ],
-        },
-      };
+              identity: payload.email
+            }
+          ]
+        }
+      }
       const userModels =
         role === BackendTypes.Roles.CLIENT
           ? await contractModel?.$get('users', where)
-          : await DBModels.UserModel.findAll(where);
+          : await DBModels.UserModel.findAll(where)
       if (userModels?.length !== 0) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_NEW_USER_ALREADY_EXIST);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_NEW_USER_ALREADY_EXIST)
       }
-      const user = await this.createUserObject(role, ikomidaID, payload);
-      user.avatar = payload.avatar;
+      const user = await this.createUserObject(role, ikomidaID, payload)
+      user.avatar = payload.avatar
       if (payload.password) {
-        user.password = (await cryptPassword(payload.password)).hash;
+        user.password = (await cryptPassword(payload.password)).hash
       } else {
         //TODO: -- Put corrct error code
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_NEW_USER_ALREADY_EXIST);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_NEW_USER_ALREADY_EXIST)
       }
-      const userModel = await new DBModels.UserModel(user).save();
+      transaction = await Domain.SqlDB.sequelize.transaction({
+        autocommit: false
+      })
+      const userModel = await DBModels.UserModel.create(user.toJSON(), { transaction })
       if (role === BackendTypes.Roles.CLIENT) {
-        await contractModel?.$add('users', userModel);
+        await contractModel?.$add('users', userModel, { transaction })
       }
       const termDetails = {
         termId: termModel?.id,
@@ -563,28 +596,28 @@ export default class Users {
         text: termModel?.text,
         type: termModel?.type,
         contract: contractModel?.id,
-        user: userModel?.id,
-      };
-      const hash = crypto.createHash('sha256').update(JSON.stringify(termDetails)).digest('base64');
-      const termHashModel = await termModel?.$create('termHash', { hash });
-      await userModel?.$set('termHash', termHashModel);
-      if (role === BackendTypes.Roles.CLIENT) {
-        await contractModel?.$add('termHashs', termHashModel);
+        user: userModel?.id
       }
-
+      const hash = crypto.createHash('sha256').update(JSON.stringify(termDetails)).digest('base64')
+      const termHashModel = await termModel?.$create('termHash', { hash }, { transaction })
+      await userModel?.$set('termHash', termHashModel, { transaction })
+      if (role === BackendTypes.Roles.CLIENT) {
+        await contractModel?.$add('termHashs', termHashModel, { transaction })
+      }
+      await transaction.commit()
       try {
         if (userModel) {
-          let emailMessage;
+          let message
 
           if (role === BackendTypes.Roles.CLIENT) {
-            emailMessage = new Utils.Email(
+            message = new Utils.Email(
               Utils.Email.CLIENT_REGISTRATION_SUCCESSFULL,
               contractModel?.contractName ?? 'iKomida',
               userModel?.name,
-              contractModel?.contractName ?? 'iKomida',
-            );
+              contractModel?.contractName ?? 'iKomida'
+            )
           } else {
-            emailMessage = new Utils.Email(
+            message = new Utils.Email(
               Utils.Email.RESELLER_REGISTRATION_SUCCESSFULL,
               'iKomida vendedor',
               userModel?.name,
@@ -592,106 +625,118 @@ export default class Users {
               userModel?.phone,
               '',
               'iKomida',
-              this.host,
-            );
+              this.host
+            )
           }
-          const emailPayload = new Types.Classes.CAMQPPayload<Types.Classes.CAMQPPayloadObject>();
-          emailPayload.method = 'send';
-          const payloadObject: Types.Classes.CAMQPPayloadObject = Types.Classes.CAMQPPayloadObject.fromObject({
+          const emailPayload = new Types.Classes.CAMQPPayload<Types.Classes.CAMQPPayloadObject>()
+          emailPayload.method = 'send'
+          const messagePayload: Types.Classes.CEmail = Types.Classes.CEmail.fromObject({
             from: {
               email: `no-replay@ikomida.com`,
-              name: `iKomida`,
+              name: `iKomida`
             },
             to: {
               email: userModel?.email,
-              name: `${userModel?.name} ${userModel?.lastName}`,
+              name: `${userModel?.name} ${userModel?.lastName}`
             },
-            message: emailMessage,
-          });
-          emailPayload.object = payloadObject;
-          const amqp = new Domain.RabbitMQ(this.logger);
-          await amqp?.publish(Domain.RabbitMQ.EMAIL_QUEUE, emailPayload);
-          await amqp?.close();
+            message
+          })
+          emailPayload.object = messagePayload
+          const amqp = new Domain.RabbitMQ(this.logger)
+          await amqp?.publish(Domain.RabbitMQ.EMAIL_QUEUE, emailPayload)
+          await amqp?.close()
         }
       } catch (exception: any) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_NEW_USER_EXCEPTION, exception);
-        error.log(this.logger);
+        new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_NEW_USER_EXCEPTION, exception).log(
+          this.logger
+        )
       }
+      return new Utils.Return(true)
     } catch (exception: any) {
-      const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_NEW_USER_EXCEPTION, exception);
-      return error.logAndReturn(this.logger);
+      await transaction?.rollback()
+      let error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_NEW_USER_EXCEPTION, exception)
+      if (exception instanceof Utils.iKomidaError) {
+        error = exception
+      }
+      return error.logAndReturn(this.logger)
     }
-    return new Utils.Return(true);
   }
 
   async createPasswordPhoneValidation(
     role: BackendTypes.Roles | null,
     ikomidaID: string | undefined,
     input: any,
-    options: Types.Classes.CLoginOptions,
+    options: Types.Classes.CLoginOptions
   ) {
+    let transaction: Domain.SqlDB.Transaction | undefined = undefined
     try {
-      const payload: Types.Classes.CUser = Types.Classes.CUser.fromObject(input);
+      const payload: Types.Classes.CUser = Types.Classes.CUser.fromObject(input)
       if (!role || !ikomidaID) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_AUTHENTICATION);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_AUTHENTICATION)
       }
       if (!Logics.Validations.validatePhone(payload.phone)) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_MISSING_PHONE);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_MISSING_PHONE)
       }
       if (Utils.System.isDemo(ikomidaID, payload.areaCode, payload.phone)) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_AUTHENTICATION);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_AUTHENTICATION)
       }
-      const unloggedUserModels = await this.getUnloggedUserModels(
+      const { userModel, userModels, contractModel } = await this.getUnloggedUserModels(
         role,
         ikomidaID,
         options,
         payload.areaCode,
-        payload.phone,
-      );
-      if ('success' in unloggedUserModels) {
-        return unloggedUserModels;
-      }
-      const { userModel, userModels, contractModel } = unloggedUserModels;
+        payload.phone
+      )
       if (userModels?.length !== 1) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_INVALID_CONTRACT);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(
+          Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_INVALID_CONTRACT
+        )
       }
-      const code = Logics.Finances.pad(Math.ceil(Math.random() * 10000), 4);
+      const code = Logics.Finances.pad(Math.ceil(Math.random() * 10000), 4)
       payload.id = userModel?.id
       payload.ikomidaID = ikomidaID
       payload.role = role.id
       payload.phoneValidationCode = code
-      const signatureObject = payload.toJSON();
+      const signatureObject = payload.toJSON()
       delete signatureObject.signature
-      const signature = await signData(signatureObject);
+      const signature = await signData(signatureObject)
       const validationObject = {
         role,
         code,
-        signature,
-      };
-      const phoneValidationCodeModel = await userModel?.$create('phoneValidationCode', validationObject);
-      const message = new Utils.SMS(Utils.SMS.VALIDATION_CODE, code, contractModel?.contractName ?? 'iKomida');
-      const smsPayload = new Types.Classes.CAMQPPayload<Types.Classes.CAMQPPayloadObject>();
-      smsPayload.method = 'send';
-      smsPayload.object = new Types.Classes.CAMQPPayloadObject();
-      smsPayload.object.areaCode = String(payload.areaCode);
-      smsPayload.object.phone = payload.phone;
-      smsPayload.object.message = message;
-      const amqp = new Domain.RabbitMQ(this.logger);
-      await amqp?.publish(Domain.RabbitMQ.SMS_QUEUE, smsPayload);
-      await amqp?.close();
-      if (phoneValidationCodeModel) {
-        return new Utils.Return(true, signature);
+        signature
       }
+      transaction = await Domain.SqlDB.sequelize.transaction({
+        autocommit: false
+      })
+      const phoneValidationCodeModel = await userModel?.$create('phoneValidationCode', validationObject, {
+        transaction
+      })
+      const message = new Utils.SMS(Utils.SMS.VALIDATION_CODE, code, contractModel?.contractName ?? 'iKomida')
+      const smsPayload = new Types.Classes.CAMQPPayload<Types.Classes.CAMQPPayloadObject>()
+      smsPayload.method = 'send'
+      smsPayload.object = new Types.Classes.CAMQPPayloadObject()
+      smsPayload.object.areaCode = String(payload.areaCode)
+      smsPayload.object.phone = payload.phone
+      smsPayload.object.message = message
+      const amqp = new Domain.RabbitMQ(this.logger)
+      await amqp?.publish(Domain.RabbitMQ.SMS_QUEUE, smsPayload)
+      await amqp?.close()
+      if (!phoneValidationCodeModel) {
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_UNKNOWN)
+      }
+      await transaction.commit()
+      return new Utils.Return(true, signature)
     } catch (exception: any) {
-      const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_EXCEPTION, exception);
-      return error.logAndReturn(this.logger);
+      await transaction?.rollback()
+      let error = new Utils.iKomidaError(
+        Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_EXCEPTION,
+        exception
+      )
+      if (exception instanceof Utils.iKomidaError) {
+        error = exception
+      }
+      return error.logAndReturn(this.logger)
     }
-    const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_UNKNOWN);
-    return error.logAndReturn(this.logger);
   }
 
   async validatePasswordPhoneValidationCode(
@@ -699,122 +744,133 @@ export default class Users {
     ikomidaID: string | undefined,
     input: any,
     options: Types.Classes.CLoginOptions,
-    internal = false,
+    internal = false
   ) {
     try {
-      const payload: Types.Classes.CUser = Types.Classes.CUser.fromObject(input);
+      const payload: Types.Classes.CUser = Types.Classes.CUser.fromObject(input)
       if (!role || !ikomidaID) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_AUTHENTICATION);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(
+          Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_AUTHENTICATION
+        )
       }
       if (!Logics.Validations.validatePhone(payload.phone)) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_MISSING_PHONE);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_MISSING_PHONE)
       }
       if (!payload.signature) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_MISSING_SIGNATURE);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(
+          Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_MISSING_SIGNATURE
+        )
       }
       if (Utils.System.isDemo(ikomidaID, payload.areaCode, payload.phone)) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_AUTHENTICATION);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_AUTHENTICATION)
       }
       const unloggedUserModels = await this.getUnloggedUserModels(
         role,
         ikomidaID,
         options,
         payload.areaCode,
-        payload.phone,
-      );
-      if ('success' in unloggedUserModels) {
-        return unloggedUserModels;
-      }
-      const { userModel, userModels } = unloggedUserModels;
+        payload.phone
+      )
+      const { userModel, userModels } = unloggedUserModels
       if (userModels?.length !== 1) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_INVALID_CONTRACT);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(
+          Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_INVALID_CONTRACT
+        )
       }
       const phoneValidationCodeModels = await userModel?.$get('phoneValidationCodes', {
         where: {
           role,
           code: payload.phoneValidationCode,
-          signature: payload.signature,
-        },
-      });
+          signature: payload.signature
+        }
+      })
       if (phoneValidationCodeModels?.length !== 1) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_INVALID_CONTRACT);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(
+          Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_INVALID_CONTRACT
+        )
       }
       payload.id = userModel?.id
       payload.ikomidaID = ikomidaID
       payload.role = role.id
-      const signatureObject = payload.toJSON();
+      const signatureObject = payload.toJSON()
       delete signatureObject.signature
       if (await validateSignature(signatureObject, payload.signature)) {
         if (internal) {
-          return unloggedUserModels;
+          return unloggedUserModels
         }
-        return new Utils.Return(true);
+        return new Utils.Return(true)
       }
     } catch (exception: any) {
-      const error = new Utils.iKomidaError(
+      let error = new Utils.iKomidaError(
         Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_EXCEPTION,
-        exception.message,
-      );
-      return error.logAndReturn(this.logger);
+        exception.message
+      )
+      if (exception instanceof Utils.iKomidaError) {
+        error = exception
+      }
+      return error.logAndReturn(this.logger)
     }
-    const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_UNKNOWN);
-    return error.logAndReturn(this.logger);
+    const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_UNKNOWN)
+    return error.logAndReturn(this.logger)
   }
 
   async requestPassword(role: any, ikomidaID: string, input: any, options: any) {
+    let transaction: Domain.SqlDB.Transaction | undefined = undefined
     try {
       const validatePasswordPhoneValidationCode = await this.validatePasswordPhoneValidationCode(
         role,
         ikomidaID,
         input,
         options,
-        true,
-      );
+        true
+      )
       if ('success' in validatePasswordPhoneValidationCode) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_NEW_USER_INVALID_PHONE_VALIDATION_CODE);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_NEW_USER_INVALID_PHONE_VALIDATION_CODE)
       }
-      const { userModel, contractModel } = validatePasswordPhoneValidationCode;
-      const newPassword = passwordGenerator(8);
-      if (userModel) {
-        userModel.password = (await cryptPassword(newPassword)).hash;
-        await userModel?.save();
+      const { userModel, contractModel } = validatePasswordPhoneValidationCode
+      if (!userModel) {
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_NEW_USER_INVALID_PHONE_VALIDATION_CODE)
       }
-      const emailMessage = new Utils.Email(
+      const newPassword = passwordGenerator(8)
+      userModel.password = (await cryptPassword(newPassword)).hash
+      transaction = await Domain.SqlDB.sequelize.transaction({
+        autocommit: false
+      })
+      await userModel?.save({ transaction })
+      const message = new Utils.Email(
         Utils.Email.CLIENT_PASSWORD_REQUESTED_SUCCESSFULL,
         contractModel?.contractName ?? 'iKomida',
         userModel?.name,
         newPassword,
-        contractModel?.contractName ?? 'iKomida',
-      );
+        contractModel?.contractName ?? 'iKomida'
+      )
 
-      const emailPayload = new Types.Classes.CAMQPPayload<Types.Classes.CAMQPPayloadObject>();
-      emailPayload.method = 'send';
-      const payloadObject: Types.Classes.CAMQPPayloadObject = Types.Classes.CAMQPPayloadObject.fromObject({
+      const emailPayload = new Types.Classes.CAMQPPayload<Types.Classes.CAMQPPayloadObject>()
+      emailPayload.method = 'send'
+      const messagePayload: Types.Classes.CEmail = Types.Classes.CEmail.fromObject({
         from: {
           email: `no-replay@ikomida.com`,
-          name: `iKomida`,
+          name: `iKomida`
         },
         to: {
           email: userModel?.email,
-          name: `${userModel?.name} ${userModel?.lastName}`,
+          name: `${userModel?.name} ${userModel?.lastName}`
         },
-        message: emailMessage,
-      });
-      emailPayload.object = payloadObject;
-      const amqp = new Domain.RabbitMQ(this.logger);
-      await amqp?.publish(Domain.RabbitMQ.EMAIL_QUEUE, emailPayload);
-      await amqp?.close();
-      return new Utils.Return(true);
+        message
+      })
+      emailPayload.object = messagePayload
+      const amqp = new Domain.RabbitMQ(this.logger)
+      await amqp?.publish(Domain.RabbitMQ.EMAIL_QUEUE, emailPayload)
+      await amqp?.close()
+      await transaction.commit()
+      return new Utils.Return(true)
     } catch (exception: any) {
-      const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_NEW_USER_EXCEPTION, exception);
-      return error.logAndReturn(this.logger);
+      await transaction?.rollback()
+      let error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_NEW_USER_EXCEPTION, exception)
+      if (exception instanceof Utils.iKomidaError) {
+        error = exception
+      }
+      return error.logAndReturn(this.logger)
     }
   }
 
@@ -823,13 +879,11 @@ export default class Users {
     ikomidaID: string,
     payload: DBModels.UserModel | Types.Classes.CUser,
     platform?: string,
-    deviceId?: string,
+    deviceId?: string
   ) {
-    let userRole = payload.role ?? role;
+    let userRole = payload.role ?? role
     userRole =
-      userRole && BackendTypes.Roles.isInstance(userRole)
-        ? (userRole as BackendTypes.Roles).id
-        : String(userRole);
+      userRole && BackendTypes.Roles.isInstance(userRole) ? (userRole as BackendTypes.Roles).id : String(userRole)
     const userObject = Types.Classes.CUser.init(
       userRole,
       payload.name ?? '-',
@@ -839,7 +893,7 @@ export default class Users {
       payload.phone ?? '-',
       String(payload.areaCode),
       ''
-    );
+    )
     if (platform) {
       userObject.platform = platform
     }
@@ -847,236 +901,248 @@ export default class Users {
       userObject.deviceId = deviceId
     }
     if (ikomidaID) {
-      userObject.ikomidaID = ikomidaID;
+      userObject.ikomidaID = ikomidaID
     }
     try {
       if (payload.role === BackendTypes.Roles.RESELLER && payload instanceof DBModels.UserModel) {
-        userObject.referralCode = payload.referral?.code;
+        userObject.referralCode = payload.referral?.code
       }
     } catch (exception: any) {
-      new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_CREATE_USER_OBJECT_EXCEPTION, exception).log(this.logger);
+      new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_CREATE_USER_OBJECT_EXCEPTION, exception).log(
+        this.logger
+      )
     }
-    return userObject;
+    return userObject
   }
 
   async getUsersCount(identity: Types.Classes.CUser) {
-    const role = BackendTypes.Roles.valueOf(identity.role);
-    if (!role || ![BackendTypes.Roles.VENDOR, BackendTypes.Roles.STAFF].includes(role)) {
-      return new Utils.Return(false, 0);
-    }
-    const contractModel = await DBModels.ContractModel.findOne({
-      where: {
-        ikomidaID: identity.ikomidaID,
-      },
-      include: [
-        {
-          model: DBModels.UserModel,
-          where: {
-            id: identity.id,
-            role: {
-              [Domain.SqlDB.Op.in]: [BackendTypes.Roles.VENDOR, BackendTypes.Roles.STAFF, BackendTypes.Roles.ADMIN],
-            },
-          },
-          required: true,
+    try {
+      const role = BackendTypes.Roles.valueOf(identity.role)
+      if (!role || ![BackendTypes.Roles.VENDOR, BackendTypes.Roles.STAFF].includes(role)) {
+        return new Utils.Return(false, 0)
+      }
+      const contractModel = await DBModels.ContractModel.findOne({
+        where: {
+          ikomidaID: identity.ikomidaID
         },
-      ],
-    });
-    if (!contractModel) {
-      const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_USERS_GET_USER_COUNT_INVALID_CONTRACT);
-      return error.logAndReturn(this.logger);
+        include: [
+          {
+            model: DBModels.UserModel,
+            where: {
+              id: identity.id,
+              role: {
+                [Domain.SqlDB.Op.in]: [BackendTypes.Roles.VENDOR, BackendTypes.Roles.STAFF, BackendTypes.Roles.ADMIN]
+              }
+            },
+            required: true
+          }
+        ]
+      })
+      if (!contractModel) {
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_USERS_GET_USER_COUNT_INVALID_CONTRACT)
+      }
+      const userModels = await contractModel.$get('users', {
+        where: {
+          role: BackendTypes.Roles.CLIENT
+        }
+      })
+      return new Utils.Return(true, userModels.length)
+    } catch (exception: any) {
+      let error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_UPDATE_PASSWORD_EXCEPTION, exception)
+      if (exception instanceof Utils.iKomidaError) {
+        error = exception
+      }
+      return error.logAndReturn(this.logger)
     }
-    const userModels = await contractModel.$get('users', {
-      where: {
-        role: BackendTypes.Roles.CLIENT,
-      },
-    });
-    return new Utils.Return(true, userModels.length);
   }
 
   async updatePassword(identity: Types.Classes.CUser, input: any) {
     try {
-      const payload: Types.Classes.CUser = Types.Classes.CUser.fromObject(input);
+      const payload: Types.Classes.CUser = Types.Classes.CUser.fromObject(input)
       if (!this.validateUpdatePassword(payload)) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_UPDATE_PASSWORD_MISSING_DATA);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_UPDATE_PASSWORD_MISSING_DATA)
       }
       if (!Logics.Validations.validatePassword(payload.oldPass)) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_UPDATE_PASSWORD_INVALID_PASSWORD);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_UPDATE_PASSWORD_INVALID_PASSWORD)
       }
       if (!Logics.Validations.validatePassword(payload.newPass)) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_UPDATE_PASSWORD_INVALID_NEW_PASSWORD);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_UPDATE_PASSWORD_INVALID_NEW_PASSWORD)
       }
       if (payload.newPass !== payload.reNewPass) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_UPDATE_PASSWORD_INVALID_RE_NEW_PASSWORD);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_UPDATE_PASSWORD_INVALID_RE_NEW_PASSWORD)
       }
-      let userModels: DBModels.UserModel[] | undefined;
-      let contractModel;
-      const role = BackendTypes.Roles.valueOf(identity.role);
+      let userModels: DBModels.UserModel[] | undefined
+      let contractModel
+      const role = BackendTypes.Roles.valueOf(identity.role)
       if (
         !role ||
         ![BackendTypes.Roles.ADMIN, BackendTypes.Roles.RESELLER, BackendTypes.Roles.MANAGER].includes(role)
       ) {
         contractModel = await DBModels.ContractModel.findOne({
           where: {
-            ikomidaID: identity.ikomidaID,
+            ikomidaID: identity.ikomidaID
           },
           include: [
             {
               model: DBModels.UserModel,
               where: {
                 role: identity.role,
-                id: identity.id,
+                id: identity.id
               },
-              required: true,
-            },
-          ],
-        });
+              required: true
+            }
+          ]
+        })
         if (!contractModel) {
-          const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_UPDATE_PASSWORD_INVALID_CONTRACT);
-          return error.logAndReturn(this.logger);
+          throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_UPDATE_PASSWORD_INVALID_CONTRACT)
         }
-        userModels = contractModel.users;
+        userModels = contractModel.users
       } else {
         userModels = await DBModels.UserModel.findAll({
           where: {
             role: identity.role,
-            id: identity.id,
-          },
-        });
+            id: identity.id
+          }
+        })
       }
       if (userModels?.length !== 1) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_UPDATE_PASSWORD_INVALID_USER);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_UPDATE_PASSWORD_INVALID_USER)
       }
-      const userModel = userModels?.[0];
+      const userModel = userModels?.[0]
       if (Utils.System.isDemo(contractModel?.ikomidaID, userModel?.areaCode, userModel?.phone)) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_AUTHENTICATION);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_AUTHENTICATION)
       }
       if (!(await comparePassword(String(payload.oldPass), userModel?.password))) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_UPDATE_PASSWORD_AUTH_UNAUTHORIZED);
-        return error.logAndReturn(this.logger);
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_UPDATE_PASSWORD_AUTH_UNAUTHORIZED)
       }
-      if (userModel) {
-        userModel.password = (await cryptPassword(payload.newPass)).hash;
+      if (!userModel) {
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_UPDATE_PASSWORD_INVALID_USER)
       }
-      await userModel?.save();
+      userModel.password = (await cryptPassword(payload.newPass)).hash
+      await userModel?.save()
       try {
-        const emailMessage = new Utils.Email(
+        const message = new Utils.Email(
           Utils.Email.CLIENT_PASSWORD_UPDATED_SUCCESSFULL,
           contractModel?.contractName ?? 'iKomida',
           userModel?.name,
-          contractModel?.contractName ?? 'iKomida',
-        );
-        const emailPayload = new Types.Classes.CAMQPPayload<Types.Classes.CAMQPPayloadObject>();
-        emailPayload.method = 'send';
-        const payloadObject: Types.Classes.CAMQPPayloadObject = Types.Classes.CAMQPPayloadObject.fromObject({
+          contractModel?.contractName ?? 'iKomida'
+        )
+        const emailPayload = new Types.Classes.CAMQPPayload<Types.Classes.CAMQPPayloadObject>()
+        emailPayload.method = 'send'
+        const messagePayload: Types.Classes.CEmail = Types.Classes.CEmail.fromObject({
           from: {
             email: `no-replay@ikomida.com`,
-            name: `iKomida`,
+            name: `iKomida`
           },
           to: {
             email: userModel?.email,
-            name: `${userModel?.name} ${userModel?.lastName}`,
+            name: `${userModel?.name} ${userModel?.lastName}`
           },
-          message: emailMessage,
-        });
-        emailPayload.object = payloadObject;
-        const amqp = new Domain.RabbitMQ(this.logger);
-        await amqp?.publish(Domain.RabbitMQ.EMAIL_QUEUE, emailPayload);
-        await amqp?.close();
+          message
+        })
+        emailPayload.object = messagePayload
+        const amqp = new Domain.RabbitMQ(this.logger)
+        await amqp?.publish(Domain.RabbitMQ.EMAIL_QUEUE, emailPayload)
+        await amqp?.close()
       } catch (exception: any) {
-        const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_UPDATE_PASSWORD_EXCEPTION, exception);
-        error.log(this.logger);
+        new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_UPDATE_PASSWORD_EXCEPTION, exception).log(
+          this.logger
+        )
       }
-      return new Utils.Return(true);
+      return new Utils.Return(true)
     } catch (exception: any) {
-      const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_UPDATE_PASSWORD_EXCEPTION, exception);
-      return error.logAndReturn(this.logger);
+      let error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_UPDATE_PASSWORD_EXCEPTION, exception)
+      if (exception instanceof Utils.iKomidaError) {
+        error = exception
+      }
+      return error.logAndReturn(this.logger)
     }
   }
 
   async getSettings(ikomidaID: string) {
-    const contractModel = await DBModels.ContractModel.findOne({
-      where: {
-        ikomidaID,
-      },
-      include: [
-        {
-          model: DBModels.AddressModel,
-          where: {
-            role: BackendTypes.Roles.VENDOR,
+    try {
+      const contractModel = await DBModels.ContractModel.findOne({
+        where: {
+          ikomidaID
+        },
+        include: [
+          {
+            model: DBModels.AddressModel,
+            where: {
+              role: BackendTypes.Roles.VENDOR
+            },
+            required: false,
+            order: [['createdAt', 'DESC']],
+            limit: 1
           },
-          required: false,
-          order: [['createdAt', 'DESC']],
-          limit: 1,
-        },
-        {
-          model: DBModels.VendorSettingsModel,
-          required: true,
-        },
-        {
-          model: DBModels.ContractPaymentSignatureModel,
-          required: false,
-        },
-      ],
-    });
-    if (!contractModel) {
-      const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_GET_SETTINGS_INVALID_CONTRACT);
-      return error.logAndReturn(this.logger);
-    }
-    const vendorSettingsModel = contractModel?.vendorSettings;
-    if (!vendorSettingsModel) {
-      const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_GET_SETTINGS_EMPTY);
-      return error.logAndReturn(this.logger);
-    }
-    const addressModel = contractModel?.addresses?.[0];
-    const isActive =
-      contractModel?.active &&
-      contractModel?.contractPaymentSignature?.status === Types.Types.TAsaasSignatureStatus.ACTIVE;
-    const payload: Types.Classes.CVendorSettings = Types.Classes.CVendorSettings.fromObject({
-      profile: Types.Classes.CVendorProfile.init(
-        vendorSettingsModel?.areaCode ?? 0,
-        vendorSettingsModel?.contractName ?? '',
-        contractModel?.contractIdentity ?? '',
-        '',
-        vendorSettingsModel?.phone ?? '',
-        vendorSettingsModel?.email ?? '',
-        Types.Classes.CAddress.init(
-          addressModel?.postalCode ?? '',
-          addressModel?.street ?? '',
-          addressModel?.neighborhood ?? '',
-          addressModel?.city ?? '',
-          addressModel?.stat ?? '',
-          addressModel?.number ?? '',
-          addressModel?.complement ?? '',
-          addressModel?.kind,
-          addressModel?.reference,
+          {
+            model: DBModels.VendorSettingsModel,
+            required: true
+          },
+          {
+            model: DBModels.ContractPaymentSignatureModel,
+            required: false
+          }
+        ]
+      })
+      if (!contractModel) {
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_GET_SETTINGS_INVALID_CONTRACT)
+      }
+      const vendorSettingsModel = contractModel?.vendorSettings
+      if (!vendorSettingsModel) {
+        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_GET_SETTINGS_EMPTY)
+      }
+      const addressModel = contractModel?.addresses?.[0]
+      const isActive =
+        contractModel?.active &&
+        contractModel?.contractPaymentSignature?.status === Types.Types.TAsaasSignatureStatus.ACTIVE
+      const payload: Types.Classes.CVendorSettings = Types.Classes.CVendorSettings.fromObject({
+        profile: Types.Classes.CVendorProfile.init(
+          vendorSettingsModel?.areaCode ?? 0,
+          vendorSettingsModel?.contractName ?? '',
+          contractModel?.contractIdentity ?? '',
+          '',
+          vendorSettingsModel?.phone ?? '',
+          vendorSettingsModel?.email ?? '',
+          Types.Classes.CAddress.init(
+            addressModel?.postalCode ?? '',
+            addressModel?.street ?? '',
+            addressModel?.neighborhood ?? '',
+            addressModel?.city ?? '',
+            addressModel?.stat ?? '',
+            addressModel?.number ?? '',
+            addressModel?.complement ?? '',
+            addressModel?.kind,
+            addressModel?.reference
+          ),
+          vendorSettingsModel?.restaurantImage
         ),
-        vendorSettingsModel?.restaurantImage,
-      ),
-      business: Types.Classes.CBusinessTime.fromObject({
-        hours: Types.Classes.CBusinessTimeHours.fromObject(vendorSettingsModel?.businessHours),
-        days: vendorSettingsModel?.businessDays,
-      }),
-      delivery: Types.Classes.CVendorDelivery.init(
-        vendorSettingsModel?.deliveryFree ?? false,
-        vendorSettingsModel?.delivery ?? 0,
-        vendorSettingsModel?.deliveryMin ?? 0,
-      ),
-      preparation: Types.Classes.CVendorPreparation.init(
-        vendorSettingsModel?.preparationMin ?? 0,
-        vendorSettingsModel?.preparationMax ?? 0,
-      ),
-      isActive,
-    });
-    return new Utils.Return(true, payload);
+        business: Types.Classes.CBusinessTime.fromObject({
+          hours: Types.Classes.CBusinessTimeHours.fromObject(vendorSettingsModel?.businessHours),
+          days: vendorSettingsModel?.businessDays
+        }),
+        delivery: Types.Classes.CVendorDelivery.init(
+          vendorSettingsModel?.deliveryFree ?? false,
+          vendorSettingsModel?.delivery ?? 0,
+          vendorSettingsModel?.deliveryMin ?? 0
+        ),
+        preparation: Types.Classes.CVendorPreparation.init(
+          vendorSettingsModel?.preparationMin ?? 0,
+          vendorSettingsModel?.preparationMax ?? 0
+        ),
+        isActive
+      })
+      return new Utils.Return(true, payload)
+    } catch (exception: any) {
+      let error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_UPDATE_PASSWORD_EXCEPTION, exception)
+      if (exception instanceof Utils.iKomidaError) {
+        error = exception
+      }
+      return error.logAndReturn(this.logger)
+    }
   }
 
   validateUpdatePassword(payload: any) {
-    return objHasProp(['oldPass', 'newPass', 'reNewPass'], payload);
+    return objHasProp(['oldPass', 'newPass', 'reNewPass'], payload)
   }
 }
