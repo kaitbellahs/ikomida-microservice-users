@@ -148,6 +148,9 @@ export default class Users {
     const phone = Logics.Finances.toNumber(phoneNumber)
     if (role && [BackendTypes.Roles.CLIENT, BackendTypes.Roles.VENDOR, BackendTypes.Roles.STAFF].includes(role)) {
       const rules = role === BackendTypes.Roles.VENDOR ? [BackendTypes.Roles.VENDOR, BackendTypes.Roles.STAFF] : [role]
+      if (role === BackendTypes.Roles.CLIENT && phone === '11900000000' && areaCode === '55') {
+        ikomidaID = 'com.ikomida.br.demo'
+      }
       if (isLoggin) {
         loginFailModel = await DBModels.LoginFailModel.findOne({
           where: {
@@ -167,9 +170,6 @@ export default class Users {
         if (!this.userAllowed(loginFailModel)) {
           await this.handleBlock(loginFailModel)
         }
-      }
-      if (role === BackendTypes.Roles.CLIENT && phone === '11900000000' && areaCode === '55') {
-        ikomidaID = 'com.ikomida.br.demo'
       }
       const findOne = {
         where: {
@@ -208,6 +208,7 @@ export default class Users {
     } else {
       if (isLoggin) {
         loginFailModel = await DBModels.LoginFailModel.findOne({
+
           where: {
             [Domain.SqlDB.Op.or]: [
               { ip: options.ip },
