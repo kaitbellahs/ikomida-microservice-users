@@ -146,7 +146,7 @@ export default class Users {
     }
     const areaCode = Logics.Finances.toNumber(areaCodeNumber)
     const phone = Logics.Finances.toNumber(phoneNumber)
-    if (role && [BackendTypes.Roles.CLIENT, BackendTypes.Roles.VENDOR, BackendTypes.Roles.STAFF].includes(role)) {
+    if (role && (BackendTypes.Roles.isClient(role) || BackendTypes.Roles.isVendor(role))) {
       const rules = role === BackendTypes.Roles.VENDOR ? [BackendTypes.Roles.VENDOR, BackendTypes.Roles.STAFF] : [role]
       if (role === BackendTypes.Roles.CLIENT && phone === '11900000000' && areaCode === '55') {
         ikomidaID = 'com.ikomida.br.demo'
@@ -205,16 +205,16 @@ export default class Users {
         throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_AUTH_INVALID_CONTRACT)
       }
       userModels = contractModel?.users
-    } else {
+    } else if (role && (BackendTypes.Roles.isReseller(role) || BackendTypes.Roles.isInternal(role))) {
+      const rules = role === BackendTypes.Roles.ADMIN ? [BackendTypes.Roles.ADMIN, BackendTypes.Roles.MANAGER, BackendTypes.Roles.APP, BackendTypes.Roles.FINANCE, BackendTypes.Roles.ANALYTICAL, BackendTypes.Roles.MARKETING] : [role]
       if (isLoggin) {
         loginFailModel = await DBModels.LoginFailModel.findOne({
-
           where: {
             [Domain.SqlDB.Op.or]: [
               { ip: options.ip },
               {
                 role: {
-                  [Domain.SqlDB.Op.in]: role
+                  [Domain.SqlDB.Op.in]: rules
                 },
                 phone,
                 areaCode
@@ -227,7 +227,9 @@ export default class Users {
         }
       }
       const where = {
-        role,
+        role: {
+          [Domain.SqlDB.Op.in]: rules
+        },
         phone,
         areaCode
       }
