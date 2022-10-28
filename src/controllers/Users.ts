@@ -14,7 +14,7 @@ import {
 } from '@ikomida/shared-backend'
 import { CompactSign, importPKCS8 } from 'jose'
 import crypto from 'crypto'
-import { IiKomidaErrorModel } from '@ikomida/shared-backend/lib/Utils/iKomidaError'
+import { IiKomidaErrorModel } from '@ikomida/shared-backend/lib/src/Utils/iKomidaError'
 
 const host: any = {
   development: 'https://dev.reseller.ikomida.com/',
@@ -23,7 +23,6 @@ const host: any = {
 }
 
 export default class Users {
-
   IKOMIDA_GATEWAY_SERVICE_AUTH_MULTI_DEVICE: IiKomidaErrorModel = {
     code: 'IMUA001',
     message:
@@ -206,7 +205,17 @@ export default class Users {
       }
       userModels = contractModel?.users
     } else if (role && (BackendTypes.Roles.isReseller(role) || BackendTypes.Roles.isInternal(role))) {
-      const rules = role === BackendTypes.Roles.ADMIN ? [BackendTypes.Roles.ADMIN, BackendTypes.Roles.MANAGER, BackendTypes.Roles.APP, BackendTypes.Roles.FINANCE, BackendTypes.Roles.ANALYTICAL, BackendTypes.Roles.MARKETING] : [role]
+      const rules =
+        role === BackendTypes.Roles.ADMIN
+          ? [
+            BackendTypes.Roles.ADMIN,
+            BackendTypes.Roles.MANAGER,
+            BackendTypes.Roles.APP,
+            BackendTypes.Roles.FINANCE,
+            BackendTypes.Roles.ANALYTICAL,
+            BackendTypes.Roles.MARKETING
+          ]
+          : [role]
       if (isLoggin) {
         loginFailModel = await DBModels.LoginFailModel.findOne({
           where: {
