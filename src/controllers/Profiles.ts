@@ -1,5 +1,5 @@
 import { Utils, Types, BackendTypes, DBModels } from '@ikomida/shared-backend'
-import { IiKomidaErrorModel } from '@ikomida/shared-backend/lib/Utils/iKomidaError'
+import { IiKomidaErrorModel } from '@ikomida/shared-backend/lib/src/Utils/iKomidaError'
 
 export default class Profiles {
   private IKOMIDA_USERS_SERVICE_PROFILE_UPDATE_AVATAR_INVALID_AVATAR: IiKomidaErrorModel = {

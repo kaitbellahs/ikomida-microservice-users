@@ -14,7 +14,7 @@ import {
 } from '@ikomida/shared-backend'
 import { CompactSign, importPKCS8 } from 'jose'
 import crypto from 'crypto'
-import { IiKomidaErrorModel } from '@ikomida/shared-backend/lib/Utils/iKomidaError'
+import { IiKomidaErrorModel } from '@ikomida/shared-backend/lib/src/Utils/iKomidaError'
 
 const host: any = {
   development: 'https://dev.reseller.ikomida.com/',
@@ -23,7 +23,6 @@ const host: any = {
 }
 
 export default class Users {
-
   IKOMIDA_GATEWAY_SERVICE_AUTH_MULTI_DEVICE: IiKomidaErrorModel = {
     code: 'IMUA001',
     message:
@@ -206,7 +205,17 @@ export default class Users {
       }
       userModels = contractModel?.users
     } else if (role && (BackendTypes.Roles.isReseller(role) || BackendTypes.Roles.isInternal(role))) {
-      const rules = role === BackendTypes.Roles.ADMIN ? [BackendTypes.Roles.ADMIN, BackendTypes.Roles.MANAGER, BackendTypes.Roles.APP, BackendTypes.Roles.FINANCE, BackendTypes.Roles.ANALYTICAL, BackendTypes.Roles.MARKETING] : [role]
+      const rules =
+        role === BackendTypes.Roles.ADMIN
+          ? [
+              BackendTypes.Roles.ADMIN,
+              BackendTypes.Roles.MANAGER,
+              BackendTypes.Roles.APP,
+              BackendTypes.Roles.FINANCE,
+              BackendTypes.Roles.ANALYTICAL,
+              BackendTypes.Roles.MARKETING
+            ]
+          : [role]
       if (isLoggin) {
         loginFailModel = await DBModels.LoginFailModel.findOne({
           where: {
@@ -1100,12 +1109,12 @@ export default class Users {
         contractModel?.contractPaymentSignature?.status === Types.Types.TAsaasSignatureStatus.ACTIVE
       const payload: Types.Classes.CVendorSettings = Types.Classes.CVendorSettings.fromObject({
         profile: Types.Classes.CVendorProfile.init(
-          vendorSettingsModel?.areaCode ?? 0,
-          vendorSettingsModel?.contractName ?? '',
+          vendorSettingsModel.areaCode ?? 0,
+          vendorSettingsModel.contractName ?? '',
           contractModel?.contractIdentity ?? '',
           '',
-          vendorSettingsModel?.phone ?? '',
-          vendorSettingsModel?.email ?? '',
+          vendorSettingsModel.phone ?? '',
+          vendorSettingsModel.email ?? '',
           Types.Classes.CAddress.init(
             addressModel?.postalCode ?? '',
             addressModel?.street ?? '',
@@ -1117,22 +1126,24 @@ export default class Users {
             addressModel?.kind,
             addressModel?.reference
           ),
-          vendorSettingsModel?.restaurantImage
+          vendorSettingsModel.restaurantImage
         ),
         business: Types.Classes.CBusinessTime.fromObject({
-          hours: Types.Classes.CBusinessTimeHours.fromObject(vendorSettingsModel?.businessHours),
-          days: vendorSettingsModel?.businessDays
+          hours: Types.Classes.CBusinessTimeHours.fromObject(vendorSettingsModel.businessHours),
+          days: vendorSettingsModel.businessDays
         }),
         delivery: Types.Classes.CVendorDelivery.init(
-          vendorSettingsModel?.deliveryFree ?? false,
-          vendorSettingsModel?.delivery ?? 0,
-          vendorSettingsModel?.deliveryMin ?? 0
+          vendorSettingsModel.deliveryFree ?? false,
+          vendorSettingsModel.delivery ?? 0,
+          vendorSettingsModel.deliveryMin ?? 0
         ),
         preparation: Types.Classes.CVendorPreparation.init(
-          vendorSettingsModel?.preparationMin ?? 0,
-          vendorSettingsModel?.preparationMax ?? 0
+          vendorSettingsModel.preparationMin ?? 0,
+          vendorSettingsModel.preparationMax ?? 0
         ),
-        isActive
+        isActive,
+        orderTypes: vendorSettingsModel.orderTypes,
+        tip: vendorSettingsModel.tip
       })
       return new Utils.Return(true, payload)
     } catch (exception: any) {
