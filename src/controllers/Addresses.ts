@@ -34,6 +34,8 @@ export default class Addresses {
         return error.logAndReturn(this.logger)
       }
       const [distance, duration] = calcDistanceResponse as number[]
+
+      const location: Types.Classes.CLocation = await Utils.GoogleAdmin.getGeocoding(payload)
       await userModel.$create('address', {
         kind: Types.Types.TAddress.RESIDENTIAL,
         role: identity.role,
@@ -47,6 +49,10 @@ export default class Addresses {
         distance,
         duration,
         stat: payload.stat,
+        coordinates: BackendTypes.CGeometry.init(BackendTypes.TGeometry.POINT, [
+          location.latitude ?? 0,
+          location.longitude ?? 0
+        ]).toJSON(),
         contractId: contractModel.id
       })
       return await this.getAddresses(identity)
@@ -126,6 +132,10 @@ export default class Addresses {
         addressModel?.distance,
         addressModel?.duration,
         addressModel?.selected,
+        Types.Classes.CLocation.fromObject({
+          latitude: addressModel?.coordinates?.coordinates?.[0],
+          longitude: addressModel?.coordinates?.coordinates?.[1]
+        }),
         addressModel?.id
       )
     })
