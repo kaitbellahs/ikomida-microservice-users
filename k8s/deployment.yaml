@@ -110,3 +110,8 @@ spec:
                 secretKeyRef:
                   name: environment
                   key: CALC_DISTANCE_API_KEY
+            - name: GEOCODING_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: GEOCODING_API_KEY

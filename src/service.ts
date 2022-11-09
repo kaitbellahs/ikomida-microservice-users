@@ -118,7 +118,8 @@ app.post('/subscribe', async (req, res) => {
   const payload = await users.newUser(
     BackendTypes.Roles.valueOf(String(req.headers?.['x-ikomida-agent'])),
     String(req.headers?.['x-ikomida-id']),
-    req.body
+    req.body,
+    options(req.headers)
   )
   res.status(payload?.success ? 201 : 400).sendResponse(payload)
 })
