@@ -208,13 +208,13 @@ export default class Users {
       const rules =
         role === BackendTypes.Roles.ADMIN
           ? [
-              BackendTypes.Roles.ADMIN,
-              BackendTypes.Roles.MANAGER,
-              BackendTypes.Roles.APP,
-              BackendTypes.Roles.FINANCE,
-              BackendTypes.Roles.ANALYTICAL,
-              BackendTypes.Roles.MARKETING
-            ]
+            BackendTypes.Roles.ADMIN,
+            BackendTypes.Roles.MANAGER,
+            BackendTypes.Roles.APP,
+            BackendTypes.Roles.FINANCE,
+            BackendTypes.Roles.ANALYTICAL,
+            BackendTypes.Roles.MARKETING
+          ]
           : [role]
       if (isLoggin) {
         loginFailModel = await DBModels.LoginFailModel.findOne({
@@ -412,6 +412,7 @@ export default class Users {
           Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_INVALID_CONTRACT
         )
       }
+      await this.isUniqueUser(role, payload, contractModel)
       const code = Logics.Finances.pad(Math.ceil(Math.random() * 10000), 4)
       payload.ikomidaID = ikomidaID
       payload.role = role.id
@@ -507,6 +508,7 @@ export default class Users {
           Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_INVALID_CONTRACT
         )
       }
+      await this.isUniqueUser(role, payload, contractModel)
       payload.ikomidaID = ikomidaID
       payload.role = role.id
       const signatureObject = payload.toJSON()
@@ -535,7 +537,38 @@ export default class Users {
     return error.logAndReturn(this.logger)
   }
 
-  async newUser(role: BackendTypes.Roles | null, ikomidaID: string, input: any) {
+  private async isUniqueUser(
+    role: BackendTypes.Roles | null,
+    payload: Types.Classes.CUser,
+    contractModel?: DBModels.ContractModel | null
+  ) {
+    const where = {
+      where: {
+        role,
+        [Domain.SqlDB.Op.or]: [
+          {
+            areaCode: Logics.Finances.toNumber(payload.areaCode),
+            phone: Logics.Finances.toNumber(payload.phone)
+          },
+          {
+            identity: Logics.Finances.toNumber(payload.identity)
+          },
+          {
+            identity: payload.email
+          }
+        ]
+      }
+    }
+    const userModels =
+      role === BackendTypes.Roles.CLIENT
+        ? await contractModel?.$get('users', where)
+        : await DBModels.UserModel.findAll(where)
+    if (userModels?.length !== 0) {
+      throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_NEW_USER_ALREADY_EXIST)
+    }
+    return true
+  }
+  async newUser(role: BackendTypes.Roles | null, ikomidaID: string, input: any, options: Types.Classes.CLoginOptions) {
     let transaction: Domain.SqlDB.Transaction | undefined = undefined
     try {
       const payload: Types.Classes.CUser = Types.Classes.CUser.fromObject(input)
@@ -562,31 +595,8 @@ export default class Users {
       if (!validatePhoneValidationCode?.success) {
         throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_NEW_USER_INVALID_PHONE_VALIDATION_CODE)
       }
-      const where = {
-        where: {
-          role,
-          [Domain.SqlDB.Op.or]: [
-            {
-              areaCode: Logics.Finances.toNumber(payload.areaCode),
-              phone: Logics.Finances.toNumber(payload.phone)
-            },
-            {
-              identity: Logics.Finances.toNumber(payload.identity)
-            },
-            {
-              identity: payload.email
-            }
-          ]
-        }
-      }
-      const userModels =
-        role === BackendTypes.Roles.CLIENT
-          ? await contractModel?.$get('users', where)
-          : await DBModels.UserModel.findAll(where)
-      if (userModels?.length !== 0) {
-        throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_NEW_USER_ALREADY_EXIST)
-      }
-      const user = await this.createUserObject(role, ikomidaID, payload)
+      await this.isUniqueUser(role, payload, contractModel)
+      let user = await this.createUserObject(role, ikomidaID, payload)
       user.avatar = payload.avatar
       if (payload.password) {
         user.password = (await cryptPassword(payload.password)).hash
@@ -662,7 +672,17 @@ export default class Users {
           this.logger
         )
       }
-      return new Utils.Return(true)
+      user = await this.createUserObject(role, ikomidaID, userModel, options?.platform ?? '-', options.deviceId)
+      user.id = userModel.id
+
+      const result = await this.generateAccessToken(user)
+      await DBModels.UserInfoModel.destroy({
+        where: {
+          userId: userModel?.id
+        }
+      })
+      await userModel.$create('userInfo', options)
+      return new Utils.Return(result !== null, result)
     } catch (exception: any) {
       await transaction?.rollback()
       let error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_NEW_USER_EXCEPTION, exception)
@@ -1124,7 +1144,14 @@ export default class Users {
             addressModel?.number ?? '',
             addressModel?.complement ?? '',
             addressModel?.kind,
-            addressModel?.reference
+            addressModel?.reference,
+            undefined,
+            undefined,
+            undefined,
+            Types.Classes.CLocation.fromObject({
+              latitude: addressModel?.coordinates?.coordinates?.[0],
+              longitude: addressModel?.coordinates?.coordinates?.[1]
+            })
           ),
           vendorSettingsModel.restaurantImage
         ),
