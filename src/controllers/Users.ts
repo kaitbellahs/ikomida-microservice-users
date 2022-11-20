@@ -39,9 +39,9 @@ export default class Users {
 
   async logOut(identity: Types.Classes.CUser) {
     try {
-      const role = BackendTypes.Roles.valueOf(identity.role)
+      const role = identity.role
       let userModels: DBModels.UserModel[] | undefined
-      if (role && [BackendTypes.Roles.CLIENT, BackendTypes.Roles.VENDOR, BackendTypes.Roles.STAFF].includes(role)) {
+      if (role && [Types.Types.TRoles.CLIENT, Types.Types.TRoles.VENDOR, Types.Types.TRoles.STAFF].includes(role)) {
         const contractModel = await DBModels.ContractModel.findOne({
           where: {
             ikomidaID: identity?.ikomidaID
@@ -123,7 +123,7 @@ export default class Users {
   }
 
   private async getUnloggedUserModels(
-    role: BackendTypes.Roles | null,
+    role: Types.Types.TRoles | null,
     ikomidaID: string,
     options: Types.Classes.CLoginOptions,
     areaCodeNumber: string | number | undefined,
@@ -145,9 +145,9 @@ export default class Users {
     }
     const areaCode = Logics.Finances.toNumber(areaCodeNumber)
     const phone = Logics.Finances.toNumber(phoneNumber)
-    if (role && (BackendTypes.Roles.isClient(role) || BackendTypes.Roles.isVendor(role))) {
-      const rules = role === BackendTypes.Roles.VENDOR ? [BackendTypes.Roles.VENDOR, BackendTypes.Roles.STAFF] : [role]
-      if (role === BackendTypes.Roles.CLIENT && phone === '11900000000' && areaCode === '55') {
+    if (role && (Types.Types.TRoles.isClient(role) || Types.Types.TRoles.isVendor(role))) {
+      const rules = role === Types.Types.TRoles.VENDOR ? [Types.Types.TRoles.VENDOR, Types.Types.TRoles.STAFF] : [role]
+      if (role === Types.Types.TRoles.CLIENT && phone === '11900000000' && areaCode === '55') {
         ikomidaID = 'com.ikomida.br.demo'
       }
       if (isLoggin) {
@@ -204,17 +204,17 @@ export default class Users {
         throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_AUTH_INVALID_CONTRACT)
       }
       userModels = contractModel?.users
-    } else if (role && (BackendTypes.Roles.isReseller(role) || BackendTypes.Roles.isInternal(role))) {
+    } else if (role && (Types.Types.TRoles.isReseller(role) || Types.Types.TRoles.isInternal(role))) {
       const rules =
-        role === BackendTypes.Roles.ADMIN
+        role === Types.Types.TRoles.ADMIN
           ? [
-            BackendTypes.Roles.ADMIN,
-            BackendTypes.Roles.MANAGER,
-            BackendTypes.Roles.APP,
-            BackendTypes.Roles.FINANCE,
-            BackendTypes.Roles.ANALYTICAL,
-            BackendTypes.Roles.MARKETING
-          ]
+              Types.Types.TRoles.ADMIN,
+              Types.Types.TRoles.MANAGER,
+              Types.Types.TRoles.APP,
+              Types.Types.TRoles.FINANCE,
+              Types.Types.TRoles.ANALYTICAL,
+              Types.Types.TRoles.MARKETING
+            ]
           : [role]
       if (isLoggin) {
         loginFailModel = await DBModels.LoginFailModel.findOne({
@@ -293,7 +293,7 @@ export default class Users {
     options: Types.Classes.CLoginOptions
   ) {
     try {
-      const role = BackendTypes.Roles.valueOf(inputRole)
+      const role = Types.Types.TRoles.valueOf(inputRole)
       if (
         (!role || !ikomidaID) &&
         (!options.platform || !options.deviceId || !options.ip || !areaCode || !phone || !password)
@@ -333,7 +333,7 @@ export default class Users {
       await loginFailModel?.destroy()
       const userInfoModel = userModel?.userInfos?.[0]
       if (
-        (!role || !BackendTypes.Roles.isInternal(role)) &&
+        (!role || !Types.Types.TRoles.isInternal(role)) &&
         userInfoModel &&
         (!(options.platform !== null && [undefined, options.platform].includes(userInfoModel?.platform)) ||
           !(options.deviceId !== null && [undefined, options.deviceId].includes(userInfoModel?.deviceId)))
@@ -342,7 +342,7 @@ export default class Users {
         error.setStatus(409)
         throw error
       }
-      const user = await this.createUserObject(role, ikomidaID, userModel, options?.platform ?? '-', options.deviceId)
+      const user = await this.createUserObject(role!, ikomidaID, userModel, options?.platform ?? '-', options.deviceId)
       user.id = userModel.id
 
       const result = await this.generateAccessToken(user)
@@ -370,14 +370,14 @@ export default class Users {
     }
   }
 
-  async createPhoneValidation(role: BackendTypes.Roles | null, ikomidaID: string | undefined, input: any) {
+  async createPhoneValidation(role: Types.Types.TRoles | null, ikomidaID: string | undefined, input: any) {
     let transaction: Domain.SqlDB.Transaction | undefined = undefined
     try {
       const payload: Types.Classes.CUser = Types.Classes.CUser.fromObject(input)
       if (!Logics.Validations.validateUUID(payload.termId)) {
         throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_MISSING_TERM)
       }
-      if (!ikomidaID || role !== BackendTypes.Roles.CLIENT) {
+      if (!ikomidaID || role !== Types.Types.TRoles.CLIENT) {
         throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_AUTHENTICATION)
       }
       if ((payload.name?.length ?? 0) <= 2) {
@@ -415,7 +415,7 @@ export default class Users {
       await this.isUniqueUser(role, payload, contractModel)
       const code = Logics.Finances.pad(Math.ceil(Math.random() * 10000), 4)
       payload.ikomidaID = ikomidaID
-      payload.role = role.id
+      payload.role = role
       payload.phoneValidationCode = code
       const signatureObject = payload.toJSON()
       delete signatureObject.signature
@@ -460,13 +460,13 @@ export default class Users {
     return error.logAndReturn(this.logger)
   }
 
-  async validatePhoneValidationCode(role: BackendTypes.Roles | null, ikomidaID: string, input: any) {
+  async validatePhoneValidationCode(role: Types.Types.TRoles | null, ikomidaID: string, input: any) {
     try {
       const payload: Types.Classes.CUser = Types.Classes.CUser.fromObject(input)
       if (!Logics.Validations.validateUUID(payload.termId)) {
         throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_MISSING_TERM)
       }
-      if (!ikomidaID || role !== BackendTypes.Roles.CLIENT) {
+      if (!ikomidaID || role !== Types.Types.TRoles.CLIENT) {
         throw new Utils.iKomidaError(
           Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_AUTHENTICATION
         )
@@ -510,7 +510,7 @@ export default class Users {
       }
       await this.isUniqueUser(role, payload, contractModel)
       payload.ikomidaID = ikomidaID
-      payload.role = role.id
+      payload.role = role
       const signatureObject = payload.toJSON()
       delete signatureObject.signature
       if (await validateSignature(signatureObject, payload.signature)) {
@@ -538,7 +538,7 @@ export default class Users {
   }
 
   private async isUniqueUser(
-    role: BackendTypes.Roles | null,
+    role: Types.Types.TRoles | null,
     payload: Types.Classes.CUser,
     contractModel?: DBModels.ContractModel | null
   ) {
@@ -560,7 +560,7 @@ export default class Users {
       }
     }
     const userModels =
-      role === BackendTypes.Roles.CLIENT
+      role === Types.Types.TRoles.CLIENT
         ? await contractModel?.$get('users', where)
         : await DBModels.UserModel.findAll(where)
     if (userModels?.length !== 0) {
@@ -568,11 +568,11 @@ export default class Users {
     }
     return true
   }
-  async newUser(role: BackendTypes.Roles | null, ikomidaID: string, input: any, options: Types.Classes.CLoginOptions) {
+  async newUser(role: Types.Types.TRoles | null, ikomidaID: string, input: any, options: Types.Classes.CLoginOptions) {
     let transaction: Domain.SqlDB.Transaction | undefined = undefined
     try {
       const payload: Types.Classes.CUser = Types.Classes.CUser.fromObject(input)
-      if (!role || ![BackendTypes.Roles.CLIENT, BackendTypes.Roles.RESELLER].includes(role)) {
+      if (!role || ![Types.Types.TRoles.CLIENT, Types.Types.TRoles.RESELLER].includes(role)) {
         throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_CONTRACT_SERVICE_INVALID_TERM_ID)
       }
       const termModel = await DBModels.TermModel.findOne({
@@ -588,7 +588,7 @@ export default class Users {
           ikomidaID
         }
       })
-      if (role === BackendTypes.Roles.CLIENT && !contractModel) {
+      if (role === Types.Types.TRoles.CLIENT && !contractModel) {
         throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_NEW_USER_INVALID_CONTRACT)
       }
       const validatePhoneValidationCode = await this.validatePhoneValidationCode(role, ikomidaID, input)
@@ -608,7 +608,7 @@ export default class Users {
         autocommit: false
       })
       const userModel = await DBModels.UserModel.create(user.toJSON(), { transaction })
-      if (role === BackendTypes.Roles.CLIENT) {
+      if (role === Types.Types.TRoles.CLIENT) {
         await contractModel?.$add('users', userModel, { transaction })
       }
       const termDetails = {
@@ -622,7 +622,7 @@ export default class Users {
       const hash = crypto.createHash('sha256').update(JSON.stringify(termDetails)).digest('base64')
       const termHashModel = await termModel?.$create('termHash', { hash }, { transaction })
       await userModel?.$set('termHash', termHashModel, { transaction })
-      if (role === BackendTypes.Roles.CLIENT) {
+      if (role === Types.Types.TRoles.CLIENT) {
         await contractModel?.$add('termHashs', termHashModel, { transaction })
       }
       await transaction.commit()
@@ -630,7 +630,7 @@ export default class Users {
         if (userModel) {
           let message
 
-          if (role === BackendTypes.Roles.CLIENT) {
+          if (role === Types.Types.TRoles.CLIENT) {
             message = new Utils.Email(
               Utils.Email.CLIENT_REGISTRATION_SUCCESSFULL,
               contractModel?.contractName ?? 'iKomida',
@@ -694,7 +694,7 @@ export default class Users {
   }
 
   async createPasswordPhoneValidation(
-    role: BackendTypes.Roles | null,
+    role: Types.Types.TRoles | null,
     ikomidaID: string | undefined,
     input: any,
     options: Types.Classes.CLoginOptions
@@ -726,7 +726,7 @@ export default class Users {
       const code = Logics.Finances.pad(Math.ceil(Math.random() * 10000), 4)
       payload.id = userModel?.id
       payload.ikomidaID = ikomidaID
-      payload.role = role.id
+      payload.role = role
       payload.phoneValidationCode = code
       const signatureObject = payload.toJSON()
       delete signatureObject.signature
@@ -771,7 +771,7 @@ export default class Users {
   }
 
   async validatePasswordPhoneValidationCode(
-    role: BackendTypes.Roles | null,
+    role: Types.Types.TRoles | null,
     ikomidaID: string | undefined,
     input: any,
     options: Types.Classes.CLoginOptions,
@@ -822,7 +822,7 @@ export default class Users {
       }
       payload.id = userModel?.id
       payload.ikomidaID = ikomidaID
-      payload.role = role.id
+      payload.role = role
       const signatureObject = payload.toJSON()
       delete signatureObject.signature
       if (await validateSignature(signatureObject, payload.signature)) {
@@ -906,15 +906,13 @@ export default class Users {
   }
 
   private async createUserObject(
-    role: BackendTypes.Roles | null,
+    role: Types.Types.TRoles,
     ikomidaID: string,
     payload: DBModels.UserModel | Types.Classes.CUser,
     platform?: string,
     deviceId?: string
   ) {
-    let userRole = payload.role ?? role
-    userRole =
-      userRole && BackendTypes.Roles.isInstance(userRole) ? (userRole as BackendTypes.Roles).id : String(userRole)
+    const userRole = payload.role ?? role
     const userObject = Types.Classes.CUser.init(
       userRole,
       payload.name ?? '-',
@@ -935,7 +933,7 @@ export default class Users {
       userObject.ikomidaID = ikomidaID
     }
     try {
-      if (payload.role === BackendTypes.Roles.RESELLER && payload instanceof DBModels.UserModel) {
+      if (payload.role === Types.Types.TRoles.RESELLER && payload instanceof DBModels.UserModel) {
         userObject.referralCode = payload.referral?.code
       }
     } catch (exception: any) {
@@ -948,8 +946,8 @@ export default class Users {
 
   async getUsersCount(identity: Types.Classes.CUser) {
     try {
-      const role = BackendTypes.Roles.valueOf(identity.role)
-      if (!role || ![BackendTypes.Roles.VENDOR, BackendTypes.Roles.STAFF].includes(role)) {
+      const role = identity.role
+      if (!role || ![Types.Types.TRoles.VENDOR, Types.Types.TRoles.STAFF].includes(role)) {
         return new Utils.Return(false, 0)
       }
       const contractModel = await DBModels.ContractModel.findOne({
@@ -962,7 +960,7 @@ export default class Users {
             where: {
               id: identity.id,
               role: {
-                [Domain.SqlDB.Op.in]: [BackendTypes.Roles.VENDOR, BackendTypes.Roles.STAFF, BackendTypes.Roles.ADMIN]
+                [Domain.SqlDB.Op.in]: [Types.Types.TRoles.VENDOR, Types.Types.TRoles.STAFF, Types.Types.TRoles.ADMIN]
               }
             },
             required: true
@@ -974,7 +972,7 @@ export default class Users {
       }
       const userModels = await contractModel.$get('users', {
         where: {
-          role: BackendTypes.Roles.CLIENT
+          role: Types.Types.TRoles.CLIENT
         }
       })
       return new Utils.Return(true, userModels.length)
@@ -1004,10 +1002,10 @@ export default class Users {
       }
       let userModels: DBModels.UserModel[] | undefined
       let contractModel
-      const role = BackendTypes.Roles.valueOf(identity.role)
+      const role = identity.role
       if (
         !role ||
-        ![BackendTypes.Roles.ADMIN, BackendTypes.Roles.RESELLER, BackendTypes.Roles.MANAGER].includes(role)
+        ![Types.Types.TRoles.ADMIN, Types.Types.TRoles.RESELLER, Types.Types.TRoles.MANAGER].includes(role)
       ) {
         contractModel = await DBModels.ContractModel.findOne({
           where: {
@@ -1100,7 +1098,7 @@ export default class Users {
           {
             model: DBModels.AddressModel,
             where: {
-              role: BackendTypes.Roles.VENDOR
+              role: Types.Types.TRoles.VENDOR
             },
             required: false,
             order: [['createdAt', 'DESC']],
@@ -1162,6 +1160,7 @@ export default class Users {
         delivery: Types.Classes.CVendorDelivery.init(
           vendorSettingsModel.deliveryFree ?? false,
           vendorSettingsModel.delivery ?? 0,
+          vendorSettingsModel.orderMinValue ?? 0,
           vendorSettingsModel.deliveryMin ?? 0
         ),
         preparation: Types.Classes.CVendorPreparation.init(
