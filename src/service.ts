@@ -98,7 +98,7 @@ app.delete('/logout', async (req, res) => {
 
 app.post('/requestPhoneValidation', async (req, res) => {
   const payload = await users.createPhoneValidation(
-    BackendTypes.Roles.valueOf(String(req.headers?.['x-ikomida-agent'])),
+    Types.Types.TRoles.valueOf(String(req.headers?.['x-ikomida-agent'])),
     String(req.headers?.['x-ikomida-id']),
     req.body
   )
@@ -107,7 +107,7 @@ app.post('/requestPhoneValidation', async (req, res) => {
 
 app.post('/validatePhoneValidationCode', async (req, res) => {
   const payload = await users.validatePhoneValidationCode(
-    BackendTypes.Roles.valueOf(String(req.headers?.['x-ikomida-agent'])),
+    Types.Types.TRoles.valueOf(String(req.headers?.['x-ikomida-agent'])),
     String(req.headers?.['x-ikomida-id']),
     req.body
   )
@@ -116,7 +116,7 @@ app.post('/validatePhoneValidationCode', async (req, res) => {
 
 app.post('/subscribe', async (req, res) => {
   const payload = await users.newUser(
-    BackendTypes.Roles.valueOf(String(req.headers?.['x-ikomida-agent'])),
+    Types.Types.TRoles.valueOf(String(req.headers?.['x-ikomida-agent'])),
     String(req.headers?.['x-ikomida-id']),
     req.body,
     options(req.headers)
@@ -126,7 +126,7 @@ app.post('/subscribe', async (req, res) => {
 
 app.post('/requestPasswordPhoneValidation', async (req, res) => {
   const payload = await users.createPasswordPhoneValidation(
-    BackendTypes.Roles.valueOf(String(req.headers?.['x-ikomida-agent'])),
+    Types.Types.TRoles.valueOf(String(req.headers?.['x-ikomida-agent'])),
     String(req.headers?.['x-ikomida-id']),
     req.body,
     options(req.headers)
@@ -136,7 +136,7 @@ app.post('/requestPasswordPhoneValidation', async (req, res) => {
 
 app.post('/validatePasswordPhoneValidationCode', async (req, res) => {
   const payload = (await users.validatePasswordPhoneValidationCode(
-    BackendTypes.Roles.valueOf(String(req.headers?.['x-ikomida-agent'])),
+    Types.Types.TRoles.valueOf(String(req.headers?.['x-ikomida-agent'])),
     String(req.headers?.['x-ikomida-id']),
     req.body,
     options(req.headers)
@@ -146,7 +146,7 @@ app.post('/validatePasswordPhoneValidationCode', async (req, res) => {
 
 app.post('/requestPassword', async (req, res) => {
   const payload = await users.requestPassword(
-    BackendTypes.Roles.valueOf(String(req.headers?.['x-ikomida-agent'])),
+    Types.Types.TRoles.valueOf(String(req.headers?.['x-ikomida-agent'])),
     String(req.headers?.['x-ikomida-id']),
     req.body,
     options(req.headers)
