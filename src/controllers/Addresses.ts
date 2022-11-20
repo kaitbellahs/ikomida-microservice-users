@@ -151,7 +151,7 @@ export default class Addresses {
         {
           model: DBModels.AddressModel,
           where: {
-            role: BackendTypes.Roles.VENDOR
+            role: Types.Types.TRoles.VENDOR
           },
           required: false,
           order: [['createdAt', 'DESC']],
@@ -163,11 +163,11 @@ export default class Addresses {
             id: identity.id,
             role: {
               [Domain.SqlDB.Op.in]: [
-                BackendTypes.Roles.VENDOR,
-                BackendTypes.Roles.STAFF,
-                BackendTypes.Roles.CLIENT,
-                BackendTypes.Roles.ADMIN,
-                BackendTypes.Roles.RESELLER
+                Types.Types.TRoles.VENDOR,
+                Types.Types.TRoles.STAFF,
+                Types.Types.TRoles.CLIENT,
+                Types.Types.TRoles.ADMIN,
+                Types.Types.TRoles.RESELLER
               ]
             }
           },
