@@ -23,8 +23,8 @@ export default class Profiles {
 
       let userModels: DBModels.UserModel[] | undefined
       let contractModel
-      const role = BackendTypes.Roles.valueOf(identity.role)
-      if (!role || (role !== BackendTypes.Roles.RESELLER && !BackendTypes.Roles.isInternal(role))) {
+      const role = identity.role
+      if (!role || (role !== Types.Types.TRoles.RESELLER && !Types.Types.TRoles.isInternal(role))) {
         contractModel = await DBModels.ContractModel.findOne({
           where: {
             ikomidaID: identity.ikomidaID
@@ -85,8 +85,8 @@ export default class Profiles {
     try {
       let userModels: DBModels.UserModel[] | undefined
       let contractModel
-      const role = BackendTypes.Roles.valueOf(identity.role)
-      if (!role || (role !== BackendTypes.Roles.RESELLER && !BackendTypes.Roles.isInternal(role))) {
+      const role = identity.role
+      if (!role || (role !== Types.Types.TRoles.RESELLER && !Types.Types.TRoles.isInternal(role))) {
         contractModel = await DBModels.ContractModel.findOne({
           where: {
             ikomidaID: identity.ikomidaID
@@ -144,7 +144,7 @@ export default class Profiles {
       }
       const address = userModel.addresses?.[0]
       const user = Types.Classes.CUser.init(
-        userModel.role?.id ?? '-',
+        userModel.role ?? Types.Types.TRoles.CLIENT,
         userModel.name ?? '-',
         userModel.lastName ?? '-',
         userModel.identity ?? '-',
