@@ -212,13 +212,13 @@
   resolved "https://registry.yarnpkg.com/@humanwhocodes/object-schema/-/object-schema-1.2.1.tgz#b520529ec21d8e5945a1851dfd1c32e94e39ff45"
   integrity sha512-ZnQMnLV4e7hDlUvw8H+U8ASL02SS2Gn6+9Ac3wGGLIe7+je2AeAOxPY+izIPJDfFDb7eDjev0Us8MO1iFRN8hA==
 
-"@ikomida/shared-backend@^1.6.1":
-  version "1.6.1"
-  resolved "https://us-central1-npm.pkg.dev/ikomida-dev/node/@ikomida/shared-backend/-/@ikomida/shared-backend-1.6.1.tgz#5e40fdf1ce302ad56a878d197faf307b2bdaee0b"
-  integrity sha512-Wc4HF3BizFBpxUQgZhvmESbBJ9QCYoVbsm1X2Zeh9aDkoUEgZBYpZm/ldsM5X7Eerl+hLL43te0zIhU3ck/slg==
+"@ikomida/shared-backend@^1.6.3":
+  version "1.6.3"
+  resolved "https://us-central1-npm.pkg.dev/ikomida-dev/node/@ikomida/shared-backend/-/@ikomida/shared-backend-1.6.3.tgz#f3e6c860d659b1a3e99c0b3d16c3287abf6fc6eb"
+  integrity sha512-pxc12fuBXEh8XHU8OqfUZkWog1H/aswD+bZlAYAY2QTk++K4RcLqzOc3lskD2VwvXkSOcy5mnwLZI1Q9sRSOsQ==
   dependencies:
     amqplib "^0.10.3"
-    axios "^1.2.0"
+    axios "^1.2.1"
     bcrypt "^5.1.0"
     firebase-admin "^11.3.0"
     jose "^4.11.1"
@@ -944,7 +944,7 @@ axios@^0.27.2:
     follow-redirects "^1.14.9"
     form-data "^4.0.0"
 
-axios@^1.2.0:
+axios@^1.2.1:
   version "1.2.1"
   resolved "https://registry.yarnpkg.com/axios/-/axios-1.2.1.tgz#44cf04a3c9f0c2252ebd85975361c026cb9f864a"
   integrity sha512-I88cFiGu9ryt/tfVEi4kX2SITsvDddTajXTOFmt2uK1ZVA8LytjtdeyefdQWEf5PU8w+4SSJDoYnggflB5tW4A==

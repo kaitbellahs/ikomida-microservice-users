@@ -1,6 +1,6 @@
 {
   "name": "ikomida-users-service",
-  "version": "1.1.9",
+  "version": "1.2.0",
   "description": "ikomida users service",
   "private": true,
   "module": "build/service.js",
@@ -27,7 +27,7 @@
   "author": "Khalid Ait Bellahs",
   "license": "UNLICENSED",
   "dependencies": {
-    "@ikomida/shared-backend": "^1.6.1",
+    "@ikomida/shared-backend": "^1.6.3",
     "@ikomida/shared-logics": "^1.2.2",
     "@ikomida/shared-types": "^1.7.0",
     "body-parser": "^1.20.1",
