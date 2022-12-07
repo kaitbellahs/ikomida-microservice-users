@@ -1,4 +1,4 @@
-import { Utils, Types, BackendTypes, DBModels } from '@ikomida/shared-backend'
+import { Utils, Types, DBModels } from '@ikomida/shared-backend'
 import { IiKomidaErrorModel } from '@ikomida/shared-backend/lib/src/Utils/iKomidaError'
 
 export default class Profiles {
@@ -24,6 +24,9 @@ export default class Profiles {
       let userModels: DBModels.UserModel[] | undefined
       let contractModel
       const role = identity.role
+      if ([...Types.Types.TRoles.clients, ...Types.Types.TRoles.vendors].includes(role) && identity.phone === '11900000000' && identity.areaCode === '55') {
+        identity.ikomidaID = 'com.ikomida.br.demo'
+      }
       if (!role || (role !== Types.Types.TRoles.RESELLER && !Types.Types.TRoles.isInternal(role))) {
         contractModel = await DBModels.ContractModel.findOne({
           where: {
@@ -86,6 +89,9 @@ export default class Profiles {
       let userModels: DBModels.UserModel[] | undefined
       let contractModel
       const role = identity.role
+      if ([...Types.Types.TRoles.clients, ...Types.Types.TRoles.vendors].includes(role) && identity.phone === '11900000000' && identity.areaCode === '55') {
+        identity.ikomidaID = 'com.ikomida.br.demo'
+      }
       if (!role || (role !== Types.Types.TRoles.RESELLER && !Types.Types.TRoles.isInternal(role))) {
         contractModel = await DBModels.ContractModel.findOne({
           where: {

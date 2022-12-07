@@ -39,9 +39,12 @@ export default class Users {
 
   async logOut(identity: Types.Classes.CUser) {
     try {
+      if ([...Types.Types.TRoles.clients, ...Types.Types.TRoles.vendors].includes(identity.role) && identity.phone === '11900000000' && identity.areaCode === '55') {
+        identity.ikomidaID = 'com.ikomida.br.demo'
+      }
       const role = identity.role
       let userModels: DBModels.UserModel[] | undefined
-      if (role && [Types.Types.TRoles.CLIENT, Types.Types.TRoles.VENDOR, Types.Types.TRoles.STAFF].includes(role)) {
+      if (role && [...Types.Types.TRoles.clients, ...Types.Types.TRoles.vendors].includes(role)) {
         const contractModel = await DBModels.ContractModel.findOne({
           where: {
             ikomidaID: identity?.ikomidaID
@@ -146,8 +149,8 @@ export default class Users {
     const areaCode = Logics.Finances.toNumber(areaCodeNumber)
     const phone = Logics.Finances.toNumber(phoneNumber)
     if (role && (Types.Types.TRoles.isClient(role) || Types.Types.TRoles.isVendor(role))) {
-      const rules = role === Types.Types.TRoles.VENDOR ? [Types.Types.TRoles.VENDOR, Types.Types.TRoles.STAFF] : [role]
-      if (role === Types.Types.TRoles.CLIENT && phone === '11900000000' && areaCode === '55') {
+      const rules = role === Types.Types.TRoles.VENDOR ? Types.Types.TRoles.vendors : [role]
+      if ([...Types.Types.TRoles.clients, ...Types.Types.TRoles.vendors].includes(role) && phone === '11900000000' && areaCode === '55') {
         ikomidaID = 'com.ikomida.br.demo'
       }
       if (isLoggin) {
@@ -208,13 +211,13 @@ export default class Users {
       const rules =
         role === Types.Types.TRoles.ADMIN
           ? [
-              Types.Types.TRoles.ADMIN,
-              Types.Types.TRoles.MANAGER,
-              Types.Types.TRoles.APP,
-              Types.Types.TRoles.FINANCE,
-              Types.Types.TRoles.ANALYTICAL,
-              Types.Types.TRoles.MARKETING
-            ]
+            Types.Types.TRoles.ADMIN,
+            Types.Types.TRoles.MANAGER,
+            Types.Types.TRoles.APP,
+            Types.Types.TRoles.FINANCE,
+            Types.Types.TRoles.ANALYTICAL,
+            Types.Types.TRoles.MARKETING
+          ]
           : [role]
       if (isLoggin) {
         loginFailModel = await DBModels.LoginFailModel.findOne({
