@@ -90,6 +90,12 @@ app.post('/auth', async (req, res) => {
   res.status(payload?.success ? 201 : 403).sendResponse(payload)
 })
 
+app.delete('/deleteAccount', async (req, res) => {
+  const identity: Types.Classes.CUser = Types.Classes.CUser.fromObject(req.headers?.identity)
+  const payload = await users.deleteAccount(identity)
+  res.status(payload?.success ? 201 : 403).sendResponse(payload)
+})
+
 app.delete('/logout', async (req, res) => {
   const identity: Types.Classes.CUser = Types.Classes.CUser.fromObject(req.headers?.identity)
   const payload = await users.logOut(identity)
