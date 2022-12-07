@@ -24,7 +24,11 @@ export default class Profiles {
       let userModels: DBModels.UserModel[] | undefined
       let contractModel
       const role = identity.role
-      if ([...Types.Types.TRoles.clients, ...Types.Types.TRoles.vendors].includes(role) && identity.phone === '11900000000' && identity.areaCode === '55') {
+      if (
+        [...Types.Types.TRoles.clients, ...Types.Types.TRoles.vendors].includes(role) &&
+        identity.phone === '11900000000' &&
+        identity.areaCode === '55'
+      ) {
         identity.ikomidaID = 'com.ikomida.br.demo'
       }
       if (!role || (role !== Types.Types.TRoles.RESELLER && !Types.Types.TRoles.isInternal(role))) {
@@ -89,7 +93,11 @@ export default class Profiles {
       let userModels: DBModels.UserModel[] | undefined
       let contractModel
       const role = identity.role
-      if ([...Types.Types.TRoles.clients, ...Types.Types.TRoles.vendors].includes(role) && identity.phone === '11900000000' && identity.areaCode === '55') {
+      if (
+        [...Types.Types.TRoles.clients, ...Types.Types.TRoles.vendors].includes(role) &&
+        identity.phone === '11900000000' &&
+        identity.areaCode === '55'
+      ) {
         identity.ikomidaID = 'com.ikomida.br.demo'
       }
       if (!role || (role !== Types.Types.TRoles.RESELLER && !Types.Types.TRoles.isInternal(role))) {
