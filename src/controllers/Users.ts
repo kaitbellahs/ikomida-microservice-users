@@ -37,9 +37,82 @@ export default class Users {
     this.host = host[process.env.NODE_ENV ?? 'development']
   }
 
+  async deleteAccount(identity: Types.Classes.CUser) {
+    try {
+      if (
+        [...Types.Types.TRoles.clients, ...Types.Types.TRoles.vendors].includes(identity.role) &&
+        identity.phone === '11900000000' &&
+        identity.areaCode === '55'
+      ) {
+        identity.ikomidaID = 'com.ikomida.br.demo'
+      }
+      const role = identity.role
+      let userModels: DBModels.UserModel[] | undefined
+      if (role && [...Types.Types.TRoles.clients, ...Types.Types.TRoles.vendors].includes(role)) {
+        const contractModel = await DBModels.ContractModel.findOne({
+          where: {
+            ikomidaID: identity?.ikomidaID
+          },
+          include: {
+            model: DBModels.UserModel,
+            where: {
+              role: identity?.role,
+              id: identity?.id
+            },
+            required: true,
+            include: [
+              {
+                model: DBModels.UserInfoModel,
+                required: false
+              }
+            ]
+          }
+        })
+        if (!contractModel) {
+          throw new Utils.iKomidaError(
+            Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_INVALID_CONTRACT
+          )
+        }
+        userModels = contractModel?.users
+      } else {
+        userModels = await DBModels.UserModel.findAll({
+          where: {
+            role: identity?.role,
+            id: identity?.id
+          },
+          include: {
+            model: DBModels.UserInfoModel,
+            required: false
+          }
+        })
+      }
+      if (userModels?.length !== 1) {
+        throw new Utils.iKomidaError(
+          Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_INVALID_CONTRACT
+        )
+      }
+      if (!Utils.System.isDemo(identity.ikomidaID, identity.areaCode, identity.phone)) {
+        const userModel = userModels?.[0]
+        userModel.deleteAccount = new Date()
+        await userModel.save()
+      }
+      return new Utils.Return(true)
+    } catch (exception: any) {
+      let error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_AUTH_EXCEPTION, exception)
+      if (exception instanceof Utils.iKomidaError) {
+        error = exception
+      }
+      return error.logAndReturn(this.logger)
+    }
+  }
+
   async logOut(identity: Types.Classes.CUser) {
     try {
-      if ([...Types.Types.TRoles.clients, ...Types.Types.TRoles.vendors].includes(identity.role) && identity.phone === '11900000000' && identity.areaCode === '55') {
+      if (
+        [...Types.Types.TRoles.clients, ...Types.Types.TRoles.vendors].includes(identity.role) &&
+        identity.phone === '11900000000' &&
+        identity.areaCode === '55'
+      ) {
         identity.ikomidaID = 'com.ikomida.br.demo'
       }
       const role = identity.role
@@ -150,7 +223,11 @@ export default class Users {
     const phone = Logics.Finances.toNumber(phoneNumber)
     if (role && (Types.Types.TRoles.isClient(role) || Types.Types.TRoles.isVendor(role))) {
       const rules = role === Types.Types.TRoles.VENDOR ? Types.Types.TRoles.vendors : [role]
-      if ([...Types.Types.TRoles.clients, ...Types.Types.TRoles.vendors].includes(role) && phone === '11900000000' && areaCode === '55') {
+      if (
+        [...Types.Types.TRoles.clients, ...Types.Types.TRoles.vendors].includes(role) &&
+        phone === '11900000000' &&
+        areaCode === '55'
+      ) {
         ikomidaID = 'com.ikomida.br.demo'
       }
       if (isLoggin) {
@@ -211,13 +288,13 @@ export default class Users {
       const rules =
         role === Types.Types.TRoles.ADMIN
           ? [
-            Types.Types.TRoles.ADMIN,
-            Types.Types.TRoles.MANAGER,
-            Types.Types.TRoles.APP,
-            Types.Types.TRoles.FINANCE,
-            Types.Types.TRoles.ANALYTICAL,
-            Types.Types.TRoles.MARKETING
-          ]
+              Types.Types.TRoles.ADMIN,
+              Types.Types.TRoles.MANAGER,
+              Types.Types.TRoles.APP,
+              Types.Types.TRoles.FINANCE,
+              Types.Types.TRoles.ANALYTICAL,
+              Types.Types.TRoles.MARKETING
+            ]
           : [role]
       if (isLoggin) {
         loginFailModel = await DBModels.LoginFailModel.findOne({
@@ -362,6 +439,7 @@ export default class Users {
           }
         })
       }
+      userModel.deleteAccount = null
       await userModel?.save()
       return new Utils.Return(result !== null, result)
     } catch (exception: any) {
