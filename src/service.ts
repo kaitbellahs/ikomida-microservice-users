@@ -146,7 +146,7 @@ app.post('/validatePasswordPhoneValidationCode', async (req, res) => {
     String(req.headers?.['x-ikomida-id']),
     req.body,
     options(req.headers)
-  )) as Utils.Return<any>
+  )) as Classes.Return<any>
   res.status(payload?.success ? 200 : 400).sendResponse(payload)
 })
 

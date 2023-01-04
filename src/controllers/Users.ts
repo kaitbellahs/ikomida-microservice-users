@@ -15,6 +15,7 @@ import {
 import { CompactSign, importPKCS8 } from 'jose'
 import crypto from 'crypto'
 import { IiKomidaErrorModel } from '@ikomida/shared-backend/lib/src/Utils/iKomidaError'
+import { Classes, Interfaces } from '@ikomida/shared-types'
 
 const host: any = {
   development: 'https://dev.reseller.ikomida.com/',
@@ -96,7 +97,7 @@ export default class Users {
         userModel.deleteAccount = new Date()
         await userModel.save()
       }
-      return new Utils.Return(true)
+      return new Classes.Return(true)
     } catch (exception: any) {
       let error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_AUTH_EXCEPTION, exception)
       if (exception instanceof Utils.iKomidaError) {
@@ -166,7 +167,7 @@ export default class Users {
           userId: userModel?.id
         }
       })
-      return new Utils.Return(true)
+      return new Classes.Return(true)
     } catch (exception: any) {
       let error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_AUTH_EXCEPTION, exception)
       if (exception instanceof Utils.iKomidaError) {
@@ -441,7 +442,7 @@ export default class Users {
       }
       userModel.deleteAccount = null
       await userModel?.save()
-      return new Utils.Return(result !== null, result)
+      return new Classes.Return(result !== null, result)
     } catch (exception: any) {
       let error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_AUTH_EXCEPTION, exception)
       if (exception instanceof Utils.iKomidaError) {
@@ -524,7 +525,7 @@ export default class Users {
       await amqp?.close()
       if (phoneValidationCodeModel) {
         await transaction.commit()
-        return new Utils.Return(true, signature)
+        return new Classes.Return(true, signature)
       }
     } catch (exception: any) {
       await transaction?.rollback()
@@ -602,7 +603,7 @@ export default class Users {
             signature: payload.signature
           }
         })
-        return new Utils.Return(phoneValidationCodeModels?.length === 1)
+        return new Classes.Return(phoneValidationCodeModels?.length === 1)
       }
     } catch (exception: any) {
       let error = new Utils.iKomidaError(
@@ -763,7 +764,7 @@ export default class Users {
         }
       })
       await userModel.$create('userInfo', options)
-      return new Utils.Return(result !== null, result)
+      return new Classes.Return(result !== null, result)
     } catch (exception: any) {
       await transaction?.rollback()
       let error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_NEW_USER_EXCEPTION, exception)
@@ -837,7 +838,7 @@ export default class Users {
         throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_UNKNOWN)
       }
       await transaction.commit()
-      return new Utils.Return(true, signature)
+      return new Classes.Return(true, signature)
     } catch (exception: any) {
       await transaction?.rollback()
       let error = new Utils.iKomidaError(
@@ -910,7 +911,7 @@ export default class Users {
         if (internal) {
           return unloggedUserModels
         }
-        return new Utils.Return(true)
+        return new Classes.Return(true)
       }
     } catch (exception: any) {
       let error = new Utils.iKomidaError(
@@ -975,7 +976,7 @@ export default class Users {
       await amqp?.publish(Domain.RabbitMQ.EMAIL_QUEUE, emailPayload)
       await amqp?.close()
       await transaction.commit()
-      return new Utils.Return(true)
+      return new Classes.Return(true)
     } catch (exception: any) {
       await transaction?.rollback()
       let error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_NEW_USER_EXCEPTION, exception)
@@ -1029,7 +1030,7 @@ export default class Users {
     try {
       const role = identity.role
       if (!role || ![Types.Types.TRoles.VENDOR, Types.Types.TRoles.STAFF].includes(role)) {
-        return new Utils.Return(false, 0)
+        return new Classes.Return(false, 0)
       }
       const contractModel = await DBModels.ContractModel.findOne({
         where: {
@@ -1056,7 +1057,7 @@ export default class Users {
           role: Types.Types.TRoles.CLIENT
         }
       })
-      return new Utils.Return(true, userModels.length)
+      return new Classes.Return(true, userModels.length)
     } catch (exception: any) {
       let error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_UPDATE_PASSWORD_EXCEPTION, exception)
       if (exception instanceof Utils.iKomidaError) {
@@ -1159,7 +1160,7 @@ export default class Users {
           this.logger
         )
       }
-      return new Utils.Return(true)
+      return new Classes.Return(true)
     } catch (exception: any) {
       let error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_UPDATE_PASSWORD_EXCEPTION, exception)
       if (exception instanceof Utils.iKomidaError) {
@@ -1184,6 +1185,10 @@ export default class Users {
             required: false,
             order: [['createdAt', 'DESC']],
             limit: 1
+          },
+          {
+            model: DBModels.AppModel,
+            required: true
           },
           {
             model: DBModels.VendorSettingsModel,
@@ -1234,10 +1239,7 @@ export default class Users {
           ),
           vendorSettingsModel.restaurantImage
         ),
-        business: Types.Classes.CBusinessTime.fromObject({
-          hours: Types.Classes.CBusinessTimeHours.fromObject(vendorSettingsModel.businessHours),
-          days: vendorSettingsModel.businessDays
-        }),
+        business: vendorSettingsModel.businessHours,
         delivery: Types.Classes.CVendorDelivery.init(
           vendorSettingsModel.deliveryFree ?? false,
           vendorSettingsModel.delivery ?? 0,
@@ -1252,7 +1254,11 @@ export default class Users {
         orderTypes: vendorSettingsModel.orderTypes,
         tip: vendorSettingsModel.tip
       })
-      return new Utils.Return(true, payload)
+      const headers: Interfaces.IMetadata = {}
+      for (const app of contractModel.apps ?? []) {
+        headers[`${app.platform}-version`] = app.storeVersion
+      }
+      return new Classes.Return(true, payload, undefined, headers)
     } catch (exception: any) {
       let error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_UPDATE_PASSWORD_EXCEPTION, exception)
       if (exception instanceof Utils.iKomidaError) {

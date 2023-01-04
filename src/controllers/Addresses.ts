@@ -1,4 +1,5 @@
 import { Domain, Utils, Types, Logics, BackendTypes, DBModels, objHasProp } from '@ikomida/shared-backend'
+import { Classes } from '@ikomida/shared-types'
 
 export default class Addresses {
   logger
@@ -82,7 +83,7 @@ export default class Addresses {
           selected
         })
       }
-      return new Utils.Return(true)
+      return new Classes.Return(true)
     } catch (exception: any) {
       const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_UPDATE_ADDRESS_EXCEPTION, exception)
       return error.logAndReturn(this.logger)
@@ -105,7 +106,7 @@ export default class Addresses {
           await addressModel.destroy()
         }
       }
-      return new Utils.Return(true)
+      return new Classes.Return(true)
     } catch (exception: any) {
       const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_REMOVE_ADDRESS_EXCEPTION, exception)
       return error.logAndReturn(this.logger)
@@ -139,7 +140,7 @@ export default class Addresses {
         addressModel?.id
       )
     })
-    return new Utils.Return(addresses !== null, addresses || [])
+    return new Classes.Return(addresses !== null, addresses || [])
   }
 
   async getAddressModels(identity: Types.Classes.CUser) {

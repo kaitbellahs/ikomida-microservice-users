@@ -1,5 +1,6 @@
 import { Utils, Types, DBModels } from '@ikomida/shared-backend'
 import { IiKomidaErrorModel } from '@ikomida/shared-backend/lib/src/Utils/iKomidaError'
+import { Classes } from '@ikomida/shared-types'
 
 export default class Profiles {
   private IKOMIDA_USERS_SERVICE_PROFILE_UPDATE_AVATAR_INVALID_AVATAR: IiKomidaErrorModel = {
@@ -78,7 +79,7 @@ export default class Profiles {
         userModel.avatar
       )
       await userModel?.save()
-      return new Utils.Return(true)
+      return new Classes.Return(true)
     } catch (exception: any) {
       const error = new Utils.iKomidaError(
         Utils.iKomidaError.IKOMIDA_USERS_SERVICE_ADDRESS_NEW_ADDRESS_EXCEPTION,
@@ -193,7 +194,7 @@ export default class Profiles {
         undefined,
         userModel.referral?.code
       )
-      return new Utils.Return(true, user)
+      return new Classes.Return(true, user)
     } catch (exception: any) {
       let error = new Utils.iKomidaError(
         Utils.iKomidaError.IKOMIDA_USERS_SERVICE_ADDRESS_NEW_ADDRESS_EXCEPTION,
