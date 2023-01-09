@@ -1,20 +1,19 @@
 import {
   Domain,
-  BackendTypes,
   Utils,
   comparePassword,
   cryptPassword,
   signData,
   validateSignature,
-  Logics,
   passwordGenerator,
-  Types,
   DBModels,
   objHasProp
 } from '@ikomida/shared-backend'
 import { CompactSign, importPKCS8 } from 'jose'
 import crypto from 'crypto'
 import { IiKomidaErrorModel } from '@ikomida/shared-backend/lib/src/Utils/iKomidaError'
+import { Classes, Interfaces, Types } from '@ikomida/shared-types'
+import { Finances, Validations } from '@ikomida/shared-logics'
 
 const host: any = {
   development: 'https://dev.reseller.ikomida.com/',
@@ -37,10 +36,10 @@ export default class Users {
     this.host = host[process.env.NODE_ENV ?? 'development']
   }
 
-  async deleteAccount(identity: Types.Classes.CUser) {
+  async deleteAccount(identity: Classes.CUser) {
     try {
       if (
-        [...Types.Types.TRoles.clients, ...Types.Types.TRoles.vendors].includes(identity.role) &&
+        [...Types.TRoles.clients, ...Types.TRoles.vendors].includes(identity.role) &&
         identity.phone === '11900000000' &&
         identity.areaCode === '55'
       ) {
@@ -48,7 +47,7 @@ export default class Users {
       }
       const role = identity.role
       let userModels: DBModels.UserModel[] | undefined
-      if (role && [...Types.Types.TRoles.clients, ...Types.Types.TRoles.vendors].includes(role)) {
+      if (role && [...Types.TRoles.clients, ...Types.TRoles.vendors].includes(role)) {
         const contractModel = await DBModels.ContractModel.findOne({
           where: {
             ikomidaID: identity?.ikomidaID
@@ -96,7 +95,7 @@ export default class Users {
         userModel.deleteAccount = new Date()
         await userModel.save()
       }
-      return new Utils.Return(true)
+      return new Classes.Return(true)
     } catch (exception: any) {
       let error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_AUTH_EXCEPTION, exception)
       if (exception instanceof Utils.iKomidaError) {
@@ -106,10 +105,10 @@ export default class Users {
     }
   }
 
-  async logOut(identity: Types.Classes.CUser) {
+  async logOut(identity: Classes.CUser) {
     try {
       if (
-        [...Types.Types.TRoles.clients, ...Types.Types.TRoles.vendors].includes(identity.role) &&
+        [...Types.TRoles.clients, ...Types.TRoles.vendors].includes(identity.role) &&
         identity.phone === '11900000000' &&
         identity.areaCode === '55'
       ) {
@@ -117,7 +116,7 @@ export default class Users {
       }
       const role = identity.role
       let userModels: DBModels.UserModel[] | undefined
-      if (role && [...Types.Types.TRoles.clients, ...Types.Types.TRoles.vendors].includes(role)) {
+      if (role && [...Types.TRoles.clients, ...Types.TRoles.vendors].includes(role)) {
         const contractModel = await DBModels.ContractModel.findOne({
           where: {
             ikomidaID: identity?.ikomidaID
@@ -166,7 +165,7 @@ export default class Users {
           userId: userModel?.id
         }
       })
-      return new Utils.Return(true)
+      return new Classes.Return(true)
     } catch (exception: any) {
       let error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_AUTH_EXCEPTION, exception)
       if (exception instanceof Utils.iKomidaError) {
@@ -199,9 +198,9 @@ export default class Users {
   }
 
   private async getUnloggedUserModels(
-    role: Types.Types.TRoles | null,
+    role: Types.TRoles | null,
     ikomidaID: string,
-    options: Types.Classes.CLoginOptions,
+    options: Classes.CLoginOptions,
     areaCodeNumber: string | number | undefined,
     phoneNumber: string | number | undefined,
     isLoggin = false
@@ -219,12 +218,12 @@ export default class Users {
         }
       })
     }
-    const areaCode = Logics.Finances.toNumber(areaCodeNumber)
-    const phone = Logics.Finances.toNumber(phoneNumber)
-    if (role && (Types.Types.TRoles.isClient(role) || Types.Types.TRoles.isVendor(role))) {
-      const rules = role === Types.Types.TRoles.VENDOR ? Types.Types.TRoles.vendors : [role]
+    const areaCode = Finances.toNumber(areaCodeNumber)
+    const phone = Finances.toNumber(phoneNumber)
+    if (role && (Types.TRoles.isClient(role) || Types.TRoles.isVendor(role))) {
+      const rules = role === Types.TRoles.VENDOR ? Types.TRoles.vendors : [role]
       if (
-        [...Types.Types.TRoles.clients, ...Types.Types.TRoles.vendors].includes(role) &&
+        [...Types.TRoles.clients, ...Types.TRoles.vendors].includes(role) &&
         phone === '11900000000' &&
         areaCode === '55'
       ) {
@@ -240,8 +239,8 @@ export default class Users {
                 role: {
                   [Domain.SqlDB.Op.in]: rules
                 },
-                phone: Logics.Finances.toNumber(phoneNumber),
-                areaCode: Logics.Finances.toNumber(areaCodeNumber)
+                phone: Finances.toNumber(phoneNumber),
+                areaCode: Finances.toNumber(areaCodeNumber)
               }
             ]
           }
@@ -284,16 +283,16 @@ export default class Users {
         throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_AUTH_INVALID_CONTRACT)
       }
       userModels = contractModel?.users
-    } else if (role && (Types.Types.TRoles.isReseller(role) || Types.Types.TRoles.isInternal(role))) {
+    } else if (role && (Types.TRoles.isReseller(role) || Types.TRoles.isInternal(role))) {
       const rules =
-        role === Types.Types.TRoles.ADMIN
+        role === Types.TRoles.ADMIN
           ? [
-              Types.Types.TRoles.ADMIN,
-              Types.Types.TRoles.MANAGER,
-              Types.Types.TRoles.APP,
-              Types.Types.TRoles.FINANCE,
-              Types.Types.TRoles.ANALYTICAL,
-              Types.Types.TRoles.MARKETING
+              Types.TRoles.ADMIN,
+              Types.TRoles.MANAGER,
+              Types.TRoles.APP,
+              Types.TRoles.FINANCE,
+              Types.TRoles.ANALYTICAL,
+              Types.TRoles.MARKETING
             ]
           : [role]
       if (isLoggin) {
@@ -341,7 +340,7 @@ export default class Users {
     return { userModel, userModels, contractModel, loginFailModel }
   }
 
-  private async generateAccessToken(payload: Types.Classes.CUser) {
+  private async generateAccessToken(payload: Classes.CUser) {
     try {
       const algorithm = 'PS256'
       const hashAlgo = 'SHA256'
@@ -370,10 +369,10 @@ export default class Users {
     areaCode: string | number,
     phone: string | number,
     password: string,
-    options: Types.Classes.CLoginOptions
+    options: Classes.CLoginOptions
   ) {
     try {
-      const role = Types.Types.TRoles.valueOf(inputRole)
+      const role = Types.TRoles.valueOf(inputRole)
       if (
         (!role || !ikomidaID) &&
         (!options.platform || !options.deviceId || !options.ip || !areaCode || !phone || !password)
@@ -403,8 +402,8 @@ export default class Users {
             ip: options.ip,
             ikomidaID,
             role: userModel?.role ?? role,
-            phone: Logics.Finances.toNumber(phone),
-            areaCode: Logics.Finances.toNumber(areaCode),
+            phone: Finances.toNumber(phone),
+            areaCode: Finances.toNumber(areaCode),
             attempts: 1
           })
         }
@@ -413,7 +412,7 @@ export default class Users {
       await loginFailModel?.destroy()
       const userInfoModel = userModel?.userInfos?.[0]
       if (
-        (!role || !Types.Types.TRoles.isInternal(role)) &&
+        (!role || !Types.TRoles.isInternal(role)) &&
         userInfoModel &&
         (!(options.platform !== null && [undefined, options.platform].includes(userInfoModel?.platform)) ||
           !(options.deviceId !== null && [undefined, options.deviceId].includes(userInfoModel?.deviceId)))
@@ -441,7 +440,7 @@ export default class Users {
       }
       userModel.deleteAccount = null
       await userModel?.save()
-      return new Utils.Return(result !== null, result)
+      return new Classes.Return(result !== null, result)
     } catch (exception: any) {
       let error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_AUTH_EXCEPTION, exception)
       if (exception instanceof Utils.iKomidaError) {
@@ -451,14 +450,14 @@ export default class Users {
     }
   }
 
-  async createPhoneValidation(role: Types.Types.TRoles | null, ikomidaID: string | undefined, input: any) {
+  async createPhoneValidation(role: Types.TRoles | null, ikomidaID: string | undefined, input: any) {
     let transaction: Domain.SqlDB.Transaction | undefined = undefined
     try {
-      const payload: Types.Classes.CUser = Types.Classes.CUser.fromObject(input)
-      if (!Logics.Validations.validateUUID(payload.termId)) {
+      const payload: Classes.CUser = Classes.CUser.fromObject(input)
+      if (!Validations.validateUUID(payload.termId)) {
         throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_MISSING_TERM)
       }
-      if (!ikomidaID || role !== Types.Types.TRoles.CLIENT) {
+      if (!ikomidaID || role !== Types.TRoles.CLIENT) {
         throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_AUTHENTICATION)
       }
       if ((payload.name?.length ?? 0) <= 2) {
@@ -469,16 +468,16 @@ export default class Users {
           Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_MISSING_LAST_NAME
         )
       }
-      if (!Logics.Validations.validateCPF(payload.identity)) {
+      if (!Validations.validateCPF(payload.identity)) {
         throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_MISSING_CPF)
       }
-      if (!Logics.Validations.validateEmail(payload.email)) {
+      if (!Validations.validateEmail(payload.email)) {
         throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_MISSING_EMAIL)
       }
-      if (!Logics.Validations.validatePhone(payload.phone)) {
+      if (!Validations.validatePhone(payload.phone)) {
         throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_MISSING_PHONE)
       }
-      if (!Logics.Validations.validatePassword(payload.password)) {
+      if (!Validations.validatePassword(payload.password)) {
         throw new Utils.iKomidaError(
           Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_MISSING_PASSWORD
         )
@@ -494,7 +493,7 @@ export default class Users {
         )
       }
       await this.isUniqueUser(role, payload, contractModel)
-      const code = Logics.Finances.pad(Math.ceil(Math.random() * 10000), 4)
+      const code = Finances.pad(Math.ceil(Math.random() * 10000), 4)
       payload.ikomidaID = ikomidaID
       payload.role = role
       payload.phoneValidationCode = code
@@ -513,9 +512,9 @@ export default class Users {
         transaction
       })
       const message = new Utils.SMS(Utils.SMS.VALIDATION_CODE, code, contractModel?.contractName ?? 'iKomida')
-      const smsPayload = new Types.Classes.CAMQPPayload<Types.Classes.CAMQPPayloadObject>()
+      const smsPayload = new Classes.CAMQPPayload<Classes.CAMQPPayloadObject>()
       smsPayload.method = 'send'
-      smsPayload.object = new Types.Classes.CAMQPPayloadObject()
+      smsPayload.object = new Classes.CAMQPPayloadObject()
       smsPayload.object.areaCode = String(payload.areaCode)
       smsPayload.object.phone = payload.phone
       smsPayload.object.message = message
@@ -524,7 +523,7 @@ export default class Users {
       await amqp?.close()
       if (phoneValidationCodeModel) {
         await transaction.commit()
-        return new Utils.Return(true, signature)
+        return new Classes.Return(true, signature)
       }
     } catch (exception: any) {
       await transaction?.rollback()
@@ -541,13 +540,13 @@ export default class Users {
     return error.logAndReturn(this.logger)
   }
 
-  async validatePhoneValidationCode(role: Types.Types.TRoles | null, ikomidaID: string, input: any) {
+  async validatePhoneValidationCode(role: Types.TRoles | null, ikomidaID: string, input: any) {
     try {
-      const payload: Types.Classes.CUser = Types.Classes.CUser.fromObject(input)
-      if (!Logics.Validations.validateUUID(payload.termId)) {
+      const payload: Classes.CUser = Classes.CUser.fromObject(input)
+      if (!Validations.validateUUID(payload.termId)) {
         throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_MISSING_TERM)
       }
-      if (!ikomidaID || role !== Types.Types.TRoles.CLIENT) {
+      if (!ikomidaID || role !== Types.TRoles.CLIENT) {
         throw new Utils.iKomidaError(
           Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_AUTHENTICATION
         )
@@ -560,16 +559,16 @@ export default class Users {
           Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_MISSING_LAST_NAME
         )
       }
-      if (!Logics.Validations.validateCPF(payload.identity)) {
+      if (!Validations.validateCPF(payload.identity)) {
         throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_MISSING_CPF)
       }
-      if (!Logics.Validations.validateEmail(payload.email)) {
+      if (!Validations.validateEmail(payload.email)) {
         throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_MISSING_EMAIL)
       }
-      if (!Logics.Validations.validatePhone(payload.phone)) {
+      if (!Validations.validatePhone(payload.phone)) {
         throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_MISSING_PHONE)
       }
-      if (!Logics.Validations.validatePassword(payload.password)) {
+      if (!Validations.validatePassword(payload.password)) {
         throw new Utils.iKomidaError(
           Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_MISSING_PASSWORD
         )
@@ -602,7 +601,7 @@ export default class Users {
             signature: payload.signature
           }
         })
-        return new Utils.Return(phoneValidationCodeModels?.length === 1)
+        return new Classes.Return(phoneValidationCodeModels?.length === 1)
       }
     } catch (exception: any) {
       let error = new Utils.iKomidaError(
@@ -619,8 +618,8 @@ export default class Users {
   }
 
   private async isUniqueUser(
-    role: Types.Types.TRoles | null,
-    payload: Types.Classes.CUser,
+    role: Types.TRoles | null,
+    payload: Classes.CUser,
     contractModel?: DBModels.ContractModel | null
   ) {
     const where = {
@@ -628,11 +627,11 @@ export default class Users {
         role,
         [Domain.SqlDB.Op.or]: [
           {
-            areaCode: Logics.Finances.toNumber(payload.areaCode),
-            phone: Logics.Finances.toNumber(payload.phone)
+            areaCode: Finances.toNumber(payload.areaCode),
+            phone: Finances.toNumber(payload.phone)
           },
           {
-            identity: Logics.Finances.toNumber(payload.identity)
+            identity: Finances.toNumber(payload.identity)
           },
           {
             identity: payload.email
@@ -641,19 +640,17 @@ export default class Users {
       }
     }
     const userModels =
-      role === Types.Types.TRoles.CLIENT
-        ? await contractModel?.$get('users', where)
-        : await DBModels.UserModel.findAll(where)
+      role === Types.TRoles.CLIENT ? await contractModel?.$get('users', where) : await DBModels.UserModel.findAll(where)
     if (userModels?.length !== 0) {
       throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_NEW_USER_ALREADY_EXIST)
     }
     return true
   }
-  async newUser(role: Types.Types.TRoles | null, ikomidaID: string, input: any, options: Types.Classes.CLoginOptions) {
+  async newUser(role: Types.TRoles | null, ikomidaID: string, input: any, options: Classes.CLoginOptions) {
     let transaction: Domain.SqlDB.Transaction | undefined = undefined
     try {
-      const payload: Types.Classes.CUser = Types.Classes.CUser.fromObject(input)
-      if (!role || ![Types.Types.TRoles.CLIENT, Types.Types.TRoles.RESELLER].includes(role)) {
+      const payload: Classes.CUser = Classes.CUser.fromObject(input)
+      if (!role || ![Types.TRoles.CLIENT, Types.TRoles.RESELLER].includes(role)) {
         throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_CONTRACT_SERVICE_INVALID_TERM_ID)
       }
       const termModel = await DBModels.TermModel.findOne({
@@ -669,7 +666,7 @@ export default class Users {
           ikomidaID
         }
       })
-      if (role === Types.Types.TRoles.CLIENT && !contractModel) {
+      if (role === Types.TRoles.CLIENT && !contractModel) {
         throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_NEW_USER_INVALID_CONTRACT)
       }
       const validatePhoneValidationCode = await this.validatePhoneValidationCode(role, ikomidaID, input)
@@ -689,7 +686,7 @@ export default class Users {
         autocommit: false
       })
       const userModel = await DBModels.UserModel.create(user.toJSON(), { transaction })
-      if (role === Types.Types.TRoles.CLIENT) {
+      if (role === Types.TRoles.CLIENT) {
         await contractModel?.$add('users', userModel, { transaction })
       }
       const termDetails = {
@@ -703,7 +700,7 @@ export default class Users {
       const hash = crypto.createHash('sha256').update(JSON.stringify(termDetails)).digest('base64')
       const termHashModel = await termModel?.$create('termHash', { hash }, { transaction })
       await userModel?.$set('termHash', termHashModel, { transaction })
-      if (role === Types.Types.TRoles.CLIENT) {
+      if (role === Types.TRoles.CLIENT) {
         await contractModel?.$add('termHashs', termHashModel, { transaction })
       }
       await transaction.commit()
@@ -711,7 +708,7 @@ export default class Users {
         if (userModel) {
           let message
 
-          if (role === Types.Types.TRoles.CLIENT) {
+          if (role === Types.TRoles.CLIENT) {
             message = new Utils.Email(
               Utils.Email.CLIENT_REGISTRATION_SUCCESSFULL,
               contractModel?.contractName ?? 'iKomida',
@@ -730,9 +727,9 @@ export default class Users {
               this.host
             )
           }
-          const emailPayload = new Types.Classes.CAMQPPayload<Types.Classes.CAMQPPayloadObject>()
+          const emailPayload = new Classes.CAMQPPayload<Classes.CAMQPPayloadObject>()
           emailPayload.method = 'send'
-          const messagePayload: Types.Classes.CEmail = Types.Classes.CEmail.fromObject({
+          const messagePayload: Classes.CEmail = Classes.CEmail.fromObject({
             from: {
               email: `no-replay@ikomida.com`,
               name: `iKomida`
@@ -763,7 +760,7 @@ export default class Users {
         }
       })
       await userModel.$create('userInfo', options)
-      return new Utils.Return(result !== null, result)
+      return new Classes.Return(result !== null, result)
     } catch (exception: any) {
       await transaction?.rollback()
       let error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_NEW_USER_EXCEPTION, exception)
@@ -775,18 +772,18 @@ export default class Users {
   }
 
   async createPasswordPhoneValidation(
-    role: Types.Types.TRoles | null,
+    role: Types.TRoles | null,
     ikomidaID: string | undefined,
     input: any,
-    options: Types.Classes.CLoginOptions
+    options: Classes.CLoginOptions
   ) {
     let transaction: Domain.SqlDB.Transaction | undefined = undefined
     try {
-      const payload: Types.Classes.CUser = Types.Classes.CUser.fromObject(input)
+      const payload: Classes.CUser = Classes.CUser.fromObject(input)
       if (!role || !ikomidaID) {
         throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_AUTHENTICATION)
       }
-      if (!Logics.Validations.validatePhone(payload.phone)) {
+      if (!Validations.validatePhone(payload.phone)) {
         throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_MISSING_PHONE)
       }
       if (Utils.System.isDemo(ikomidaID, payload.areaCode, payload.phone)) {
@@ -804,7 +801,7 @@ export default class Users {
           Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_INVALID_CONTRACT
         )
       }
-      const code = Logics.Finances.pad(Math.ceil(Math.random() * 10000), 4)
+      const code = Finances.pad(Math.ceil(Math.random() * 10000), 4)
       payload.id = userModel?.id
       payload.ikomidaID = ikomidaID
       payload.role = role
@@ -824,9 +821,9 @@ export default class Users {
         transaction
       })
       const message = new Utils.SMS(Utils.SMS.VALIDATION_CODE, code, contractModel?.contractName ?? 'iKomida')
-      const smsPayload = new Types.Classes.CAMQPPayload<Types.Classes.CAMQPPayloadObject>()
+      const smsPayload = new Classes.CAMQPPayload<Classes.CAMQPPayloadObject>()
       smsPayload.method = 'send'
-      smsPayload.object = new Types.Classes.CAMQPPayloadObject()
+      smsPayload.object = new Classes.CAMQPPayloadObject()
       smsPayload.object.areaCode = String(payload.areaCode)
       smsPayload.object.phone = payload.phone
       smsPayload.object.message = message
@@ -837,7 +834,7 @@ export default class Users {
         throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_CREATE_PHONE_VALIDATION_UNKNOWN)
       }
       await transaction.commit()
-      return new Utils.Return(true, signature)
+      return new Classes.Return(true, signature)
     } catch (exception: any) {
       await transaction?.rollback()
       let error = new Utils.iKomidaError(
@@ -852,20 +849,20 @@ export default class Users {
   }
 
   async validatePasswordPhoneValidationCode(
-    role: Types.Types.TRoles | null,
+    role: Types.TRoles | null,
     ikomidaID: string | undefined,
     input: any,
-    options: Types.Classes.CLoginOptions,
+    options: Classes.CLoginOptions,
     internal = false
   ) {
     try {
-      const payload: Types.Classes.CUser = Types.Classes.CUser.fromObject(input)
+      const payload: Classes.CUser = Classes.CUser.fromObject(input)
       if (!role || !ikomidaID) {
         throw new Utils.iKomidaError(
           Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_AUTHENTICATION
         )
       }
-      if (!Logics.Validations.validatePhone(payload.phone)) {
+      if (!Validations.validatePhone(payload.phone)) {
         throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_VALIDATE_PHONE_VALIDATION_MISSING_PHONE)
       }
       if (!payload.signature) {
@@ -910,7 +907,7 @@ export default class Users {
         if (internal) {
           return unloggedUserModels
         }
-        return new Utils.Return(true)
+        return new Classes.Return(true)
       }
     } catch (exception: any) {
       let error = new Utils.iKomidaError(
@@ -957,9 +954,9 @@ export default class Users {
         contractModel?.contractName ?? 'iKomida'
       )
 
-      const emailPayload = new Types.Classes.CAMQPPayload<Types.Classes.CAMQPPayloadObject>()
+      const emailPayload = new Classes.CAMQPPayload<Classes.CAMQPPayloadObject>()
       emailPayload.method = 'send'
-      const messagePayload: Types.Classes.CEmail = Types.Classes.CEmail.fromObject({
+      const messagePayload: Classes.CEmail = Classes.CEmail.fromObject({
         from: {
           email: `no-replay@ikomida.com`,
           name: `iKomida`
@@ -975,7 +972,7 @@ export default class Users {
       await amqp?.publish(Domain.RabbitMQ.EMAIL_QUEUE, emailPayload)
       await amqp?.close()
       await transaction.commit()
-      return new Utils.Return(true)
+      return new Classes.Return(true)
     } catch (exception: any) {
       await transaction?.rollback()
       let error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_GATEWAY_SERVICE_NEW_USER_EXCEPTION, exception)
@@ -987,14 +984,14 @@ export default class Users {
   }
 
   private async createUserObject(
-    role: Types.Types.TRoles,
+    role: Types.TRoles,
     ikomidaID: string,
-    payload: DBModels.UserModel | Types.Classes.CUser,
+    payload: DBModels.UserModel | Classes.CUser,
     platform?: string,
     deviceId?: string
   ) {
     const userRole = payload.role ?? role
-    const userObject = Types.Classes.CUser.init(
+    const userObject = Classes.CUser.init(
       userRole,
       payload.name ?? '-',
       payload.lastName ?? '-',
@@ -1014,7 +1011,7 @@ export default class Users {
       userObject.ikomidaID = ikomidaID
     }
     try {
-      if (payload.role === Types.Types.TRoles.RESELLER && payload instanceof DBModels.UserModel) {
+      if (payload.role === Types.TRoles.RESELLER && payload instanceof DBModels.UserModel) {
         userObject.referralCode = payload.referral?.code
       }
     } catch (exception: any) {
@@ -1025,11 +1022,11 @@ export default class Users {
     return userObject
   }
 
-  async getUsersCount(identity: Types.Classes.CUser) {
+  async getUsersCount(identity: Classes.CUser) {
     try {
       const role = identity.role
-      if (!role || ![Types.Types.TRoles.VENDOR, Types.Types.TRoles.STAFF].includes(role)) {
-        return new Utils.Return(false, 0)
+      if (!role || ![Types.TRoles.VENDOR, Types.TRoles.STAFF].includes(role)) {
+        return new Classes.Return(false, 0)
       }
       const contractModel = await DBModels.ContractModel.findOne({
         where: {
@@ -1041,7 +1038,7 @@ export default class Users {
             where: {
               id: identity.id,
               role: {
-                [Domain.SqlDB.Op.in]: [Types.Types.TRoles.VENDOR, Types.Types.TRoles.STAFF, Types.Types.TRoles.ADMIN]
+                [Domain.SqlDB.Op.in]: [Types.TRoles.VENDOR, Types.TRoles.STAFF, Types.TRoles.ADMIN]
               }
             },
             required: true
@@ -1053,10 +1050,10 @@ export default class Users {
       }
       const userModels = await contractModel.$get('users', {
         where: {
-          role: Types.Types.TRoles.CLIENT
+          role: Types.TRoles.CLIENT
         }
       })
-      return new Utils.Return(true, userModels.length)
+      return new Classes.Return(true, userModels.length)
     } catch (exception: any) {
       let error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_UPDATE_PASSWORD_EXCEPTION, exception)
       if (exception instanceof Utils.iKomidaError) {
@@ -1066,16 +1063,16 @@ export default class Users {
     }
   }
 
-  async updatePassword(identity: Types.Classes.CUser, input: any) {
+  async updatePassword(identity: Classes.CUser, input: any) {
     try {
-      const payload: Types.Classes.CUser = Types.Classes.CUser.fromObject(input)
+      const payload: Classes.CUser = Classes.CUser.fromObject(input)
       if (!this.validateUpdatePassword(payload)) {
         throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_UPDATE_PASSWORD_MISSING_DATA)
       }
-      if (!Logics.Validations.validatePassword(payload.oldPass)) {
+      if (!Validations.validatePassword(payload.oldPass)) {
         throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_UPDATE_PASSWORD_INVALID_PASSWORD)
       }
-      if (!Logics.Validations.validatePassword(payload.newPass)) {
+      if (!Validations.validatePassword(payload.newPass)) {
         throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_UPDATE_PASSWORD_INVALID_NEW_PASSWORD)
       }
       if (payload.newPass !== payload.reNewPass) {
@@ -1084,10 +1081,7 @@ export default class Users {
       let userModels: DBModels.UserModel[] | undefined
       let contractModel
       const role = identity.role
-      if (
-        !role ||
-        ![Types.Types.TRoles.ADMIN, Types.Types.TRoles.RESELLER, Types.Types.TRoles.MANAGER].includes(role)
-      ) {
+      if (!role || ![Types.TRoles.ADMIN, Types.TRoles.RESELLER, Types.TRoles.MANAGER].includes(role)) {
         contractModel = await DBModels.ContractModel.findOne({
           where: {
             ikomidaID: identity.ikomidaID
@@ -1137,9 +1131,9 @@ export default class Users {
           userModel?.name,
           contractModel?.contractName ?? 'iKomida'
         )
-        const emailPayload = new Types.Classes.CAMQPPayload<Types.Classes.CAMQPPayloadObject>()
+        const emailPayload = new Classes.CAMQPPayload<Classes.CAMQPPayloadObject>()
         emailPayload.method = 'send'
-        const messagePayload: Types.Classes.CEmail = Types.Classes.CEmail.fromObject({
+        const messagePayload: Classes.CEmail = Classes.CEmail.fromObject({
           from: {
             email: `no-replay@ikomida.com`,
             name: `iKomida`
@@ -1159,7 +1153,7 @@ export default class Users {
           this.logger
         )
       }
-      return new Utils.Return(true)
+      return new Classes.Return(true)
     } catch (exception: any) {
       let error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_UPDATE_PASSWORD_EXCEPTION, exception)
       if (exception instanceof Utils.iKomidaError) {
@@ -1179,15 +1173,25 @@ export default class Users {
           {
             model: DBModels.AddressModel,
             where: {
-              role: Types.Types.TRoles.VENDOR
+              role: Types.TRoles.VENDOR
             },
             required: false,
             order: [['createdAt', 'DESC']],
             limit: 1
           },
           {
-            model: DBModels.VendorSettingsModel,
+            model: DBModels.AppModel,
             required: true
+          },
+          {
+            model: DBModels.VendorSettingsModel,
+            required: true,
+            include: [
+              {
+                model: DBModels.VendorPaymentGatewayModel,
+                required: false
+              }
+            ]
           },
           {
             model: DBModels.ContractPaymentSignatureModel,
@@ -1203,18 +1207,18 @@ export default class Users {
         throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_GET_SETTINGS_EMPTY)
       }
       const addressModel = contractModel?.addresses?.[0]
+      const vendorPaymentGatewayModel = vendorSettingsModel?.vendorPaymentGateway
       const isActive =
-        contractModel?.active &&
-        contractModel?.contractPaymentSignature?.status === Types.Types.TAsaasSignatureStatus.ACTIVE
-      const payload: Types.Classes.CVendorSettings = Types.Classes.CVendorSettings.fromObject({
-        profile: Types.Classes.CVendorProfile.init(
+        contractModel?.active && contractModel?.contractPaymentSignature?.status === Types.TAsaasSignatureStatus.ACTIVE
+      const payload: Classes.CVendorSettings = Classes.CVendorSettings.fromObject({
+        profile: Classes.CVendorProfile.init(
           vendorSettingsModel.areaCode ?? 0,
           vendorSettingsModel.contractName ?? '',
           contractModel?.contractIdentity ?? '',
           '',
           vendorSettingsModel.phone ?? '',
           vendorSettingsModel.email ?? '',
-          Types.Classes.CAddress.init(
+          Classes.CAddress.init(
             addressModel?.postalCode ?? '',
             addressModel?.street ?? '',
             addressModel?.neighborhood ?? '',
@@ -1227,24 +1231,22 @@ export default class Users {
             undefined,
             undefined,
             undefined,
-            Types.Classes.CLocation.fromObject({
+            Classes.CLocation.fromObject({
               latitude: addressModel?.coordinates?.coordinates?.[0],
               longitude: addressModel?.coordinates?.coordinates?.[1]
             })
           ),
           vendorSettingsModel.restaurantImage
         ),
-        business: Types.Classes.CBusinessTime.fromObject({
-          hours: Types.Classes.CBusinessTimeHours.fromObject(vendorSettingsModel.businessHours),
-          days: vendorSettingsModel.businessDays
-        }),
-        delivery: Types.Classes.CVendorDelivery.init(
+        paymentGateway: Classes.CVendorPaymentGateway.init('', vendorPaymentGatewayModel?.data ? true : false),
+        business: vendorSettingsModel.businessHours,
+        delivery: Classes.CVendorDelivery.init(
           vendorSettingsModel.deliveryFree ?? false,
           vendorSettingsModel.delivery ?? 0,
           vendorSettingsModel.orderMinValue ?? 0,
           vendorSettingsModel.deliveryMin ?? 0
         ),
-        preparation: Types.Classes.CVendorPreparation.init(
+        preparation: Classes.CVendorPreparation.init(
           vendorSettingsModel.preparationMin ?? 0,
           vendorSettingsModel.preparationMax ?? 0
         ),
@@ -1252,7 +1254,11 @@ export default class Users {
         orderTypes: vendorSettingsModel.orderTypes,
         tip: vendorSettingsModel.tip
       })
-      return new Utils.Return(true, payload)
+      const headers: Interfaces.IMetadata = {}
+      for (const app of contractModel.apps ?? []) {
+        headers[`${app.platform}-version`] = app.storeVersion
+      }
+      return new Classes.Return(true, payload, undefined, headers)
     } catch (exception: any) {
       let error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_UPDATE_PASSWORD_EXCEPTION, exception)
       if (exception instanceof Utils.iKomidaError) {
