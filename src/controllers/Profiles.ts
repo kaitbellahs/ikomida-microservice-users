@@ -1,5 +1,6 @@
-import { Utils, Types, DBModels } from '@ikomida/shared-backend'
+import { Utils, DBModels } from '@ikomida/shared-backend'
 import { IiKomidaErrorModel } from '@ikomida/shared-backend/lib/src/Utils/iKomidaError'
+import { Classes, Types } from '@ikomida/shared-types'
 
 export default class Profiles {
   private IKOMIDA_USERS_SERVICE_PROFILE_UPDATE_AVATAR_INVALID_AVATAR: IiKomidaErrorModel = {
@@ -13,9 +14,9 @@ export default class Profiles {
     this.googleAdmin = new Utils.GoogleAdmin(this.logger)
   }
 
-  async updateAvatar(identity: Types.Classes.CUser, input: any) {
+  async updateAvatar(identity: Classes.CUser, input: any) {
     try {
-      const payload: Types.Classes.CUser = Types.Classes.CUser.fromObject(input)
+      const payload: Classes.CUser = Classes.CUser.fromObject(input)
       if (!payload.avatar) {
         const error = new Utils.iKomidaError(this.IKOMIDA_USERS_SERVICE_PROFILE_UPDATE_AVATAR_INVALID_AVATAR)
         return error.logAndReturn(this.logger)
@@ -24,10 +25,14 @@ export default class Profiles {
       let userModels: DBModels.UserModel[] | undefined
       let contractModel
       const role = identity.role
-      if ([...Types.Types.TRoles.clients, ...Types.Types.TRoles.vendors].includes(role) && identity.phone === '11900000000' && identity.areaCode === '55') {
+      if (
+        [...Types.TRoles.clients, ...Types.TRoles.vendors].includes(role) &&
+        identity.phone === '11900000000' &&
+        identity.areaCode === '55'
+      ) {
         identity.ikomidaID = 'com.ikomida.br.demo'
       }
-      if (!role || (role !== Types.Types.TRoles.RESELLER && !Types.Types.TRoles.isInternal(role))) {
+      if (!role || (role !== Types.TRoles.RESELLER && !Types.TRoles.isInternal(role))) {
         contractModel = await DBModels.ContractModel.findOne({
           where: {
             ikomidaID: identity.ikomidaID
@@ -74,7 +79,7 @@ export default class Profiles {
         userModel.avatar
       )
       await userModel?.save()
-      return new Utils.Return(true)
+      return new Classes.Return(true)
     } catch (exception: any) {
       const error = new Utils.iKomidaError(
         Utils.iKomidaError.IKOMIDA_USERS_SERVICE_ADDRESS_NEW_ADDRESS_EXCEPTION,
@@ -84,15 +89,19 @@ export default class Profiles {
     }
   }
 
-  async profile(identity: Types.Classes.CUser) {
+  async profile(identity: Classes.CUser) {
     try {
       let userModels: DBModels.UserModel[] | undefined
       let contractModel
       const role = identity.role
-      if ([...Types.Types.TRoles.clients, ...Types.Types.TRoles.vendors].includes(role) && identity.phone === '11900000000' && identity.areaCode === '55') {
+      if (
+        [...Types.TRoles.clients, ...Types.TRoles.vendors].includes(role) &&
+        identity.phone === '11900000000' &&
+        identity.areaCode === '55'
+      ) {
         identity.ikomidaID = 'com.ikomida.br.demo'
       }
-      if (!role || (role !== Types.Types.TRoles.RESELLER && !Types.Types.TRoles.isInternal(role))) {
+      if (!role || (role !== Types.TRoles.RESELLER && !Types.TRoles.isInternal(role))) {
         contractModel = await DBModels.ContractModel.findOne({
           where: {
             ikomidaID: identity.ikomidaID
@@ -149,8 +158,8 @@ export default class Profiles {
         throw new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_UPDATE_PASSWORD_INVALID_USER)
       }
       const address = userModel.addresses?.[0]
-      const user = Types.Classes.CUser.init(
-        userModel.role ?? Types.Types.TRoles.CLIENT,
+      const user = Classes.CUser.init(
+        userModel.role ?? Types.TRoles.CLIENT,
         userModel.name ?? '-',
         userModel.lastName ?? '-',
         userModel.identity ?? '-',
@@ -168,7 +177,7 @@ export default class Profiles {
         undefined,
         undefined,
         undefined,
-        Types.Classes.CAddress.init(
+        Classes.CAddress.init(
           address?.postalCode ?? '-',
           address?.street ?? '-',
           address?.neighborhood ?? '-',
@@ -185,7 +194,7 @@ export default class Profiles {
         undefined,
         userModel.referral?.code
       )
-      return new Utils.Return(true, user)
+      return new Classes.Return(true, user)
     } catch (exception: any) {
       let error = new Utils.iKomidaError(
         Utils.iKomidaError.IKOMIDA_USERS_SERVICE_ADDRESS_NEW_ADDRESS_EXCEPTION,

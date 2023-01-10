@@ -1,4 +1,6 @@
-import { Domain, Utils, Types, Logics, BackendTypes, DBModels, objHasProp } from '@ikomida/shared-backend'
+import { Domain, Utils, BackendTypes, DBModels } from '@ikomida/shared-backend'
+import { Validations } from '@ikomida/shared-logics'
+import { Classes, Types } from '@ikomida/shared-types'
 
 export default class Addresses {
   logger
@@ -6,9 +8,9 @@ export default class Addresses {
     this.logger = logger
   }
 
-  async newAddress(identity: Types.Classes.CUser, input: any) {
+  async newAddress(identity: Classes.CUser, input: any) {
     try {
-      const payload: Types.Classes.CAddress = Types.Classes.CAddress.fromObject(input)
+      const payload: Classes.CAddress = Classes.CAddress.fromObject(input)
       if (!payload.validate()) {
         const error = new Utils.iKomidaError(
           Utils.iKomidaError.IKOMIDA_USERS_SERVICE_ADDRESS_NEW_ADDRESS_INVALID_ADDRESS
@@ -35,9 +37,9 @@ export default class Addresses {
       }
       const [distance, duration] = calcDistanceResponse as number[]
 
-      const location: Types.Classes.CLocation = await Utils.GoogleAdmin.getGeocoding(payload)
+      const location: Classes.CLocation = await Utils.GoogleAdmin.getGeocoding(payload)
       await userModel.$create('address', {
-        kind: Types.Types.TAddress.RESIDENTIAL,
+        kind: Types.TAddress.RESIDENTIAL,
         role: identity.role,
         postalCode: payload.postalCode,
         street: payload.street,
@@ -65,9 +67,9 @@ export default class Addresses {
     }
   }
 
-  async updateAddress(identity: Types.Classes.CUser, id?: string) {
+  async updateAddress(identity: Classes.CUser, id?: string) {
     try {
-      if (!Logics.Validations.validateUUID(id)) {
+      if (!Validations.validateUUID(id)) {
         const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_UPDATE_ADDRESS_MISSING_DATA)
         return error.logAndReturn(this.logger)
       }
@@ -82,16 +84,16 @@ export default class Addresses {
           selected
         })
       }
-      return new Utils.Return(true)
+      return new Classes.Return(true)
     } catch (exception: any) {
       const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_UPDATE_ADDRESS_EXCEPTION, exception)
       return error.logAndReturn(this.logger)
     }
   }
 
-  async removeAddress(identity: Types.Classes.CUser, id?: string) {
+  async removeAddress(identity: Classes.CUser, id?: string) {
     try {
-      if (!Logics.Validations.validateUUID(id)) {
+      if (!Validations.validateUUID(id)) {
         const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_REMOVE_ADDRESS_MISSING_DATA)
         return error.logAndReturn(this.logger)
       }
@@ -105,21 +107,21 @@ export default class Addresses {
           await addressModel.destroy()
         }
       }
-      return new Utils.Return(true)
+      return new Classes.Return(true)
     } catch (exception: any) {
       const error = new Utils.iKomidaError(Utils.iKomidaError.IKOMIDA_USERS_SERVICE_REMOVE_ADDRESS_EXCEPTION, exception)
       return error.logAndReturn(this.logger)
     }
   }
 
-  async getAddresses(identity: Types.Classes.CUser) {
+  async getAddresses(identity: Classes.CUser) {
     const addressModelsResponse = await this.getAddressModels(identity)
     if ('success' in addressModelsResponse) {
       return addressModelsResponse
     }
     const addressModels = addressModelsResponse.addressModels
     const addresses = addressModels?.map(addressModel => {
-      return Types.Classes.CAddress.init(
+      return Classes.CAddress.init(
         addressModel.postalCode ?? '-',
         addressModel.street ?? '-',
         addressModel.neighborhood ?? '-',
@@ -132,17 +134,17 @@ export default class Addresses {
         addressModel?.distance,
         addressModel?.duration,
         addressModel?.selected,
-        Types.Classes.CLocation.fromObject({
+        Classes.CLocation.fromObject({
           latitude: addressModel?.coordinates?.coordinates?.[0],
           longitude: addressModel?.coordinates?.coordinates?.[1]
         }),
         addressModel?.id
       )
     })
-    return new Utils.Return(addresses !== null, addresses || [])
+    return new Classes.Return(addresses !== null, addresses || [])
   }
 
-  async getAddressModels(identity: Types.Classes.CUser) {
+  async getAddressModels(identity: Classes.CUser) {
     const contractModel = await DBModels.ContractModel.findOne({
       where: {
         ikomidaID: identity.ikomidaID
@@ -151,7 +153,7 @@ export default class Addresses {
         {
           model: DBModels.AddressModel,
           where: {
-            role: Types.Types.TRoles.VENDOR
+            role: Types.TRoles.VENDOR
           },
           required: false,
           order: [['createdAt', 'DESC']],
@@ -163,11 +165,11 @@ export default class Addresses {
             id: identity.id,
             role: {
               [Domain.SqlDB.Op.in]: [
-                Types.Types.TRoles.VENDOR,
-                Types.Types.TRoles.STAFF,
-                Types.Types.TRoles.CLIENT,
-                Types.Types.TRoles.ADMIN,
-                Types.Types.TRoles.RESELLER
+                Types.TRoles.VENDOR,
+                Types.TRoles.STAFF,
+                Types.TRoles.CLIENT,
+                Types.TRoles.ADMIN,
+                Types.TRoles.RESELLER
               ]
             }
           },
