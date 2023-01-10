@@ -3,11 +3,11 @@ import bodyParser from 'body-parser'
 import Addresses from './controllers/Addresses.js'
 import Users from './controllers/Users.js'
 import Profiles from './controllers/Profiles.js'
-import { BackendTypes, Utils } from '@ikomida/shared-backend'
+import { Utils } from '@ikomida/shared-backend'
 
 import { createRequire } from 'module'
-import { Types } from '@ikomida/shared-backend'
 import { IncomingHttpHeaders } from 'http'
+import { Classes, Types } from '@ikomida/shared-types'
 const require = createRequire(import.meta.url)
 let { name } = require('../package.json')
 name = name
@@ -26,7 +26,7 @@ const users = new Users(logger)
 const profiles = new Profiles(logger)
 
 app.get('/addresses', async (req, res) => {
-  const identity: Types.Classes.CUser = Types.Classes.CUser.fromObject(req.headers?.identity)
+  const identity: Classes.CUser = Classes.CUser.fromObject(req.headers?.identity)
   const payload = await addresses.getAddresses(identity)
   res.sendResponse(payload)
 })
@@ -37,43 +37,43 @@ app.get('/settings', async (req, res) => {
 })
 
 app.get('/usersCount', async (req, res) => {
-  const identity: Types.Classes.CUser = Types.Classes.CUser.fromObject(req.headers?.identity)
+  const identity: Classes.CUser = Classes.CUser.fromObject(req.headers?.identity)
   const payload = await users.getUsersCount(identity)
   res.sendResponse(payload)
 })
 
 app.post('/address', async (req, res) => {
-  const identity: Types.Classes.CUser = Types.Classes.CUser.fromObject(req.headers?.identity)
+  const identity: Classes.CUser = Classes.CUser.fromObject(req.headers?.identity)
   const payload = await addresses.newAddress(identity, req.body)
   res.sendResponse(payload)
 })
 
 app.put('/address/:id', async (req, res) => {
-  const identity: Types.Classes.CUser = Types.Classes.CUser.fromObject(req.headers?.identity)
+  const identity: Classes.CUser = Classes.CUser.fromObject(req.headers?.identity)
   const payload = await addresses.updateAddress(identity, req?.params?.id)
   res.sendResponse(payload)
 })
 
 app.delete('/address/:id', async (req, res) => {
-  const identity: Types.Classes.CUser = Types.Classes.CUser.fromObject(req.headers?.identity)
+  const identity: Classes.CUser = Classes.CUser.fromObject(req.headers?.identity)
   const payload = await addresses.removeAddress(identity, req?.params?.id)
   res.sendResponse(payload)
 })
 
 app.patch('/profile/avatar', async (req, res) => {
-  const identity: Types.Classes.CUser = Types.Classes.CUser.fromObject(req.headers?.identity)
+  const identity: Classes.CUser = Classes.CUser.fromObject(req.headers?.identity)
   const payload = await profiles.updateAvatar(identity, req?.body)
   res.sendResponse(payload)
 })
 
 app.get('/profile', async (req, res) => {
-  const identity: Types.Classes.CUser = Types.Classes.CUser.fromObject(req.headers?.identity)
+  const identity: Classes.CUser = Classes.CUser.fromObject(req.headers?.identity)
   const payload = await profiles.profile(identity)
   res.sendResponse(payload)
 })
 
 app.post('/password', async (req, res) => {
-  const identity: Types.Classes.CUser = Types.Classes.CUser.fromObject(req.headers?.identity)
+  const identity: Classes.CUser = Classes.CUser.fromObject(req.headers?.identity)
   const payload = await users.updatePassword(identity, req.body)
   res.status(payload?.success ? 201 : 400).sendResponse(payload)
 })
@@ -90,15 +90,21 @@ app.post('/auth', async (req, res) => {
   res.status(payload?.success ? 201 : 403).sendResponse(payload)
 })
 
+app.delete('/deleteAccount', async (req, res) => {
+  const identity: Classes.CUser = Classes.CUser.fromObject(req.headers?.identity)
+  const payload = await users.deleteAccount(identity)
+  res.status(payload?.success ? 201 : 403).sendResponse(payload)
+})
+
 app.delete('/logout', async (req, res) => {
-  const identity: Types.Classes.CUser = Types.Classes.CUser.fromObject(req.headers?.identity)
+  const identity: Classes.CUser = Classes.CUser.fromObject(req.headers?.identity)
   const payload = await users.logOut(identity)
   res.status(payload?.success ? 201 : 403).sendResponse(payload)
 })
 
 app.post('/requestPhoneValidation', async (req, res) => {
   const payload = await users.createPhoneValidation(
-    Types.Types.TRoles.valueOf(String(req.headers?.['x-ikomida-agent'])),
+    Types.TRoles.valueOf(String(req.headers?.['x-ikomida-agent'])),
     String(req.headers?.['x-ikomida-id']),
     req.body
   )
@@ -107,7 +113,7 @@ app.post('/requestPhoneValidation', async (req, res) => {
 
 app.post('/validatePhoneValidationCode', async (req, res) => {
   const payload = await users.validatePhoneValidationCode(
-    Types.Types.TRoles.valueOf(String(req.headers?.['x-ikomida-agent'])),
+    Types.TRoles.valueOf(String(req.headers?.['x-ikomida-agent'])),
     String(req.headers?.['x-ikomida-id']),
     req.body
   )
@@ -116,7 +122,7 @@ app.post('/validatePhoneValidationCode', async (req, res) => {
 
 app.post('/subscribe', async (req, res) => {
   const payload = await users.newUser(
-    Types.Types.TRoles.valueOf(String(req.headers?.['x-ikomida-agent'])),
+    Types.TRoles.valueOf(String(req.headers?.['x-ikomida-agent'])),
     String(req.headers?.['x-ikomida-id']),
     req.body,
     options(req.headers)
@@ -126,7 +132,7 @@ app.post('/subscribe', async (req, res) => {
 
 app.post('/requestPasswordPhoneValidation', async (req, res) => {
   const payload = await users.createPasswordPhoneValidation(
-    Types.Types.TRoles.valueOf(String(req.headers?.['x-ikomida-agent'])),
+    Types.TRoles.valueOf(String(req.headers?.['x-ikomida-agent'])),
     String(req.headers?.['x-ikomida-id']),
     req.body,
     options(req.headers)
@@ -136,17 +142,17 @@ app.post('/requestPasswordPhoneValidation', async (req, res) => {
 
 app.post('/validatePasswordPhoneValidationCode', async (req, res) => {
   const payload = (await users.validatePasswordPhoneValidationCode(
-    Types.Types.TRoles.valueOf(String(req.headers?.['x-ikomida-agent'])),
+    Types.TRoles.valueOf(String(req.headers?.['x-ikomida-agent'])),
     String(req.headers?.['x-ikomida-id']),
     req.body,
     options(req.headers)
-  )) as Utils.Return<any>
+  )) as Classes.Return<any>
   res.status(payload?.success ? 200 : 400).sendResponse(payload)
 })
 
 app.post('/requestPassword', async (req, res) => {
   const payload = await users.requestPassword(
-    Types.Types.TRoles.valueOf(String(req.headers?.['x-ikomida-agent'])),
+    Types.TRoles.valueOf(String(req.headers?.['x-ikomida-agent'])),
     String(req.headers?.['x-ikomida-id']),
     req.body,
     options(req.headers)
@@ -168,7 +174,7 @@ app.listen(port, () => {
 })
 
 function options(headers: IncomingHttpHeaders) {
-  return Types.Classes.CLoginOptions.init(
+  return Classes.CLoginOptions.init(
     String(headers?.['x-client-ipaddress']),
     String(headers?.['x-forwarded-for']),
     String(headers?.['x-ikomida-plateform']),
